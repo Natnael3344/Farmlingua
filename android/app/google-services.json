@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "289922726253",
+    "project_id": "farmlingua-1e99e",
+    "storage_bucket": "farmlingua-1e99e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:289922726253:android:754c7a6423efbdac480264",
+        "android_client_info": {
+          "package_name": "com.farmlingua"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "289922726253-q12k8ea9meb7jguh2s8jl9seb31rn9jl.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAOsXT6A_N2leLENI06_L6kLGhQgYPlmPA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "289922726253-q12k8ea9meb7jguh2s8jl9seb31rn9jl.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
