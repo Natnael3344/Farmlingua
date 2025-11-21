@@ -7,6 +7,7 @@ import {
   ScrollView,
   Switch,
   TextInput,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {Ionicons} from '@react-native-vector-icons/ionicons';
@@ -20,6 +21,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../utils/ThemeContext'; // ✅ use our custom ThemeContext
 import SettingsDrawer from '../utils/SettingsDrawer';
+import { ProfileContext } from '../utils/ProfileContext';
 
 const drawerOptions = [
   { name: 'Planting & Seasons', icon: 'sunny-outline', details: 'Best time to plant by region' },
@@ -35,6 +37,7 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
   const [sessions, setSessions] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const { profile, updateProfile, fetchProfile } = useContext(ProfileContext);
 
   // ✅ use theme from context
   const {isDarkMode, toggleTheme,colors } = useContext(ThemeContext);
@@ -44,10 +47,13 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
     const keys = await AsyncStorage.getAllKeys();
     const chatKeys = keys.filter((k) => k.startsWith('chat_'));
     const stores = await AsyncStorage.multiGet(chatKeys);
+    console.log("cached store",stores)
     const data = stores.map(([key, value]) => ({
       sessionId: key.replace('chat_', ''),
       messages: JSON.parse(value),
+      title:value.text || 'Audio message'
     }));
+    console.log("data",data)
     setSessions(data.reverse());
   };
 
@@ -86,6 +92,10 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
       ]}
       onPress={() => {
         console.log(`Selected category: ${name}`);
+        navigation.navigate('ChatScreen', { 
+          categoryPrompt: name,
+          categoryDetails: details 
+        });
         navigation.closeDrawer();
       }}
     >
@@ -129,7 +139,7 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={colors.text}
           ios_backgroundColor={colors.border}
-          onValueChange={toggleTheme}
+           onValueChange={toggleTheme}
           value={isDarkMode}
           style={styles.darkModeSwitch}
         />
@@ -193,7 +203,8 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
               }}
             >
               <Text style={[styles.drawerItemText, { color: colors.text }]}>
-                Chat on {new Date(parseInt(session.sessionId)).toLocaleString()}
+                {session.title}
+                {/* Chat on {new Date(parseInt(session.sessionId)).toLocaleString()} */}
               </Text>
               <Text style={[styles.categoryDetailsText, { color: colors.textLight }]}>
                 {session.messages.length} messages
@@ -209,7 +220,8 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
 
       {/* Footer */}
       <View style={[styles.footer, { borderTopColor: colors.border }]}>
-        <Text style={[styles.profileName, { color: colors.text }]}>Jide Lawal</Text>
+        <Image source={{uri:profile?.profile_picture}} style={{width:scaleWidth(40), height:scaleWidth(40),borderRadius:scaleWidth(100)}}/>
+        <Text style={[styles.profileName, { color: colors.text }]}>{profile?.name}</Text>
         <TouchableOpacity onPress={() => setShowSettings(true)}>
           <Ionicons name="settings-outline" size={scaleHeight(24)} color={colors.text} />
         </TouchableOpacity>

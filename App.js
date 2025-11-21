@@ -21,6 +21,7 @@ import CustomDrawerContent from './src/components/CustomDrawerContent';
 import { ThemeProvider } from './src/utils/ThemeContext';
 import SettingsDrawerLayout from './src/utils/SettingsDrawer';
 import { navigationRef } from './src/utils/navigationRef';
+import {ProfileProvider} from './src/utils/ProfileContext'
 enableScreens();
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();  
@@ -50,7 +51,7 @@ const DrawerApp = ({ setSession }) => (
   >
     <Drawer.Screen name="AppContent" component={AuthStack} />
     <Drawer.Screen name="ChatScreen" component={ChatHomeSelectorScreen} />
-    <Drawer.Screen
+    {/* <Drawer.Screen
       name="SettingsDrawerLayout"
       component={SettingsDrawerLayout}
       options={{
@@ -61,7 +62,7 @@ const DrawerApp = ({ setSession }) => (
         // This is necessary to disable the main drawer's gesture
         swipeEnabled: false, 
       }}
-    />
+    /> */}
   </Drawer.Navigator>
 );
 
@@ -91,6 +92,7 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" /> 
       <ThemeProvider>
+        <ProfileProvider>
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           screenOptions={{
@@ -114,6 +116,7 @@ export default function App() {
           )}
         </Stack.Navigator>
       </NavigationContainer>
+      </ProfileProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );

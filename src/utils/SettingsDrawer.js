@@ -6,10 +6,13 @@ const { width, height } = Dimensions.get('window');
 
 const SettingsDrawer = ({ visible, onClose, navigation, setSession }) => {
   const slideAnim = useRef(new Animated.Value(width)).current;
+const handleBackdropPress = () => {
+    onClose(); 
+  };
 
   useEffect(() => {
     Animated.timing(slideAnim, {
-      toValue: visible ? width * 0.1 : width,  
+      toValue: visible ? 0 : width,  
       duration: 300,
       useNativeDriver: true,
     }).start();
@@ -20,7 +23,7 @@ const SettingsDrawer = ({ visible, onClose, navigation, setSession }) => {
   return (
     <View style={styles.overlay}>
       {/* Transparent backdrop to close when tapped outside */}
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={handleBackdropPress} />
 
       {/* The actual drawer */}
       <Animated.View
@@ -38,10 +41,11 @@ const SettingsDrawer = ({ visible, onClose, navigation, setSession }) => {
 const styles = StyleSheet.create({
   overlay: {
     position: 'absolute',
-    width,
+    width:width,
     height,
     top: 0,
     right: 0,
+    
     backgroundColor: 'transparent',
     zIndex: 99,
     flexDirection: 'row',
@@ -51,7 +55,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.3)',
   },
   drawer: {
-    width: width * 0.9,
+    width: width ,
     height,
     backgroundColor: '#fff',
     borderTopLeftRadius: 20,

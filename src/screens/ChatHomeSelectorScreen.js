@@ -1,47 +1,29 @@
 import React, { useState, useRef, useEffect, useCallback, useContext } from 'react';
 import {
   View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ScrollView,
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  Keyboard,
+  BackHandler,
 } from 'react-native';
-import {  spacing, typography, borderRadius, shadows, scaleHeight, scaleWidth } from '../utils/theme';
-import {Ionicons} from '@react-native-vector-icons/ionicons'
-import {Lucide} from '@react-native-vector-icons/lucide'
-import Logo from '../components/Logo';
-import RippleEffect from '../components/RippleEffect'
-import axios from 'axios';
-import Markdown, { MarkdownIt } from 'react-native-markdown-display';
-import { DrawerActions, useFocusEffect, useNavigation } from '@react-navigation/native';
+import { spacing, typography, borderRadius, shadows, scaleHeight, scaleWidth } from '../utils/theme';  
+import { MarkdownIt } from 'react-native-markdown-display';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../utils/ThemeContext';
-import OnboardingTutorial from './OnboardingTutorial';
-import Tooltip from 'react-native-walkthrough-tooltip';
-export const quickActions = [
-  { id: 1, title: 'Plan an Harvest', icon: 'clipboard-outline' },
-  { id: 2, title: 'Fertilizers', icon: 'flash-outline' },
-  { id: 3, title: 'Technical Help', icon: 'construct-outline' },
-  { id: 4, title: 'Irrigation', icon: 'water-outline' },
-  { id: 5, title: 'Pest Control', icon: 'warning-outline' },
-  { id: 6, title: 'Weather', icon: 'thunderstorm-outline' },
-  { id: 7, title: 'Loans & Finances', icon: 'cash-outline' },
-  { id: 8, title: 'Farm Security', icon: 'shield-outline' },
-  { id: 9, title: 'Get Farm Workers', icon: 'settings-outline' },
-];
-const generateSessionId = () => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+import RNFS from 'react-native-fs';
+import Header from '../components/Header';
+import ChatHomeContent from '../components/ChatHomeContent';
+import ChatHistory from '../components/ChatHistory';
+import ChatVoiceMode from '../components/ChatVoiceMode';
+import { generateSessionId, saveChatHistory, loadChatHistory } from '../utils/chatUtils';
+import { createStyles } from '../components/styles';
+import ApiService from '../config/apiService';
 
-// --- Main Component ---
-const ChatHomeSelectorScreen = ({navigation,route}) => {
-   
-  // States to manage the chat flow
-  const { sessionCacheId } = route.params || {};
-  const [mode, setMode] = useState('home'); // 'home', 'typing', 'response'
+const ChatHomeSelectorScreen = ({ navigation, route }) => {
+  const { sessionCacheId, categoryPrompt, categoryDetails } = route.params || {};
+  const [mode, setMode] = useState('home');
   const [message, setMessage] = useState('');
   const [userQuery, setUserQuery] = useState('');
   const [aiResponse, setAiResponse] = useState('');
@@ -53,576 +35,365 @@ const ChatHomeSelectorScreen = ({navigation,route}) => {
   const inputRef = useRef(null);
   const scrollViewRef = useRef(null);
   const [messages, setMessages] = useState([]);
-  const drawerNavigation = useNavigation();
-  const markdownItInstance = MarkdownIt({ typographer: true });
-  const {colors } = useContext(ThemeContext);
+  const markdownItInstance = MarkdownIt({ typographer: true }).disable(['link', 'image']);
+  const { colors } = useContext(ThemeContext);
   const [showTutorial, setShowTutorial] = useState(false);
   const [tutorialStep, setTutorialStep] = useState(0);
   const menuRef = useRef();
-  const attachRef=useRef();
+  const attachRef = useRef();
   const profileRef = useRef();
-const suggestionRef = useRef();
-const doneRef = useRef();
-const nextStep = () => {
-  if (tutorialStep < 5) {
-    setTutorialStep(tutorialStep + 1);
-  } else {
-    handleTutorialComplete();
-  }
-};
-
-
-
-  const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.white,
-  },
-  mainContent: {
-    flex: 1, // Crucial for making the chat/home content take available space
-  },
+  const suggestionRef = useRef();
+  const isNavigatingBackRef=useRef(false);
   
-  // --- Header Styles (Shared) ---
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  profileButton: {
-    width: scaleWidth(40),
-    height: scaleWidth(40),
-  },
-  profileImage: {
-    width: scaleWidth(40),
-    height: scaleWidth(40),
-    borderRadius: scaleWidth(100),
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  profileText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-
-  // --- Home Mode Styles (from ChatHomeSelectorScreen) ---
-  scrollContentHome: {
-    flex: 1,
-  },
-  scrollContentHomeContainer: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xxl,
-    paddingBottom: spacing.xl,
-    flexGrow: 1,
-    justifyContent: 'space-between'
-  },
-  logoContainer: {
-    alignItems: 'center',
-    marginTop: scaleHeight(100),
-    marginBottom: spacing.xl,
-  },
-  voiceModeText: {
-    ...typography.bodySmall,
-    color: colors.textLight,
-    textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  quickActionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginTop: spacing.sm,
-  },
-  quickActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 999,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginRight: spacing.sm / 2,
-    marginBottom: spacing.sm,
-    gap: scaleHeight(7),
-  },
-  quickActionText: {
-    ...typography.body,
-    color: colors.text,
-    fontSize: scaleHeight(14),
-    fontWeight: '500',
-  },
-
-  // --- Chat/Response Mode Styles (from ChatTypingScreen & ChatResponseScreen) ---
-  chatContainer: {
-    flex: 1,
-  },
-  chatContent: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.lg,
-    flexGrow: 1,
-  },
-  chatPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  chatPlaceholderText: {
-    ...typography.bodySmall,
-    color: colors.textLight,
-  },
-  userMessageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginBottom: spacing.lg,
-    alignSelf:'flex-end',
-    flexShrink: 1,
-    maxWidth: '80%',
-  },
-  messageText: {
-    ...typography.body,
-    backgroundColor: colors.chatBubbleUser,
-    color: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignSelf: 'flex-end',
-    marginRight: spacing.sm,
-    includeFontPadding: false,        
-    flexWrap: 'wrap',                 
-    textAlign: 'left', 
-     
-  },
-  userAvatar: {
-    width: scaleWidth(32),
-    height: scaleWidth(32),
-    borderRadius: scaleWidth(10),
-    backgroundColor: colors.textLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  userAvatarText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  aiMessageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  aiAvatar: {
-    width: scaleWidth(32),
-    height: scaleWidth(32),
-    borderRadius: scaleWidth(10),
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.sm,
-  },
-  aiAvatarText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  thinkingContainer: {
-    backgroundColor: colors.chatBubbleAI,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    maxWidth: '80%',
-  },
-  progressBar: {
-    width: scaleWidth(200),
-    height: scaleHeight(8),
-    backgroundColor: colors.border,
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: spacing.sm,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-  },
-  thinkingText: {
-    ...typography.bodySmall,
-    color: colors.textLight,
-  },
-  aiMessageBubble: {
-    borderWidth:1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    maxWidth: '94%',
-    alignSelf: 'flex-start',
-  },
-  aiMessageText: {
-    ...typography.body,
-    color: colors.text,
-    lineHeight: 22,
-    marginBottom: spacing.md,
-  },
-  suggestionContainer: {
-    marginBottom: spacing.md,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent:'space-between'
-  },
-  suggestionPillPrimary: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
-    flexShrink: 1,           
-    minWidth: 0,           
-    maxWidth: '48%',
-  },
-  suggestionTextPrimary: {
-    ...typography.bodySmall,
-    color: colors.black,
-  },
-  suggestionPillSecondary: {
-    backgroundColor: colors.secondaryLight,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    flexShrink: 1,           
-    minWidth: 0,           
-    maxWidth: '48%',
-
-  },
-  suggestionTextSecondary: {
-    ...typography.bodySmall,
-    color: colors.secondary,
-  },
-  actionBar: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop:spacing.md
-  },
-  actionIcon: {
-    fontSize: 14,
-  },
-
-  bottomContainer: {
-    backgroundColor: colors.white,
-  },
-  inputWrapper: {
-    paddingTop: spacing.md,
-  },
-  inputContainer: {
-    
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    ...shadows.small, 
-  },
-  inputContainerChatMode: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadows.small,
-    paddingVertical: spacing.sm,   
-  },
-  input: {
-    flex: 1,
-    ...typography.body,
-    color: colors.text,
-    paddingVertical: spacing.sm, // Adjust for Home mode
-  },
-  inputChatMode: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    maxHeight: 100,
-  },
-  attachButton: {
-    marginRight: spacing.sm,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: scaleHeight(5),
-    marginBottom: Platform.OS === 'ios' ? 0 : 2, // Fine-tuning for multiline alignment
-  },
-  micButton: {
-    marginLeft: spacing.sm,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: scaleHeight(5),
-    marginBottom: Platform.OS === 'ios' ? 0 : 2,
-  },
-  aiButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.black,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-  },
-  aiIcon: {
-    fontSize: 16,
-    color: 'white',
-  },
-  sendButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: spacing.sm,
-    alignSelf: 'flex-end',
-    marginBottom: Platform.OS === 'ios' ? 0 : 2,
-  },
-  sendButtonActive: {
-    backgroundColor: colors.black,
-    borderColor: colors.black,
-  },
-  shortcutsContainer: {
-    marginBottom: spacing.sm,
-  },
-  shortcutsContent: {
-    paddingRight: spacing.md,
-  },
-  shortcutPill: {
-    flexDirection: 'row',
-    gap: scaleWidth(5),
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    marginRight: spacing.sm,
-  },
-  shortcutText: {
-    ...typography.bodySmall,
-    color: colors.text,
-  },
-  voiceModeContainer: {
-//     flex: 1,
-//     justifyContent: 'center',
-//     alignItems: 'center',
-//     backgroundColor: colors.white,
-  },
-  voiceText: {
-    marginTop: spacing.xxl, 
-    ...typography.body,
-    color: colors.text,
-    fontSize: scaleHeight(18),
-    fontWeight: '500',
-  },
-  stopListeningButton: {
-    marginTop: spacing.xl,
-    backgroundColor: colors.black,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.full,
-  },
-  stopListeningText: {
-    color: colors.white,
-    ...typography.body,
-    fontWeight: 'bold',
-  }
-});
- useFocusEffect(
-    useCallback(() => {
-      const checkTutorialStatus = async () => {
-        try {
-          const hasCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
-          // If the flag is not set to 'true', show the tutorial
-          if (hasCompleted == 'false') {
-            setShowTutorial(true);
-          }
-        } catch (e) {
-          console.error("Failed to load onboarding status", e);
-        }
-      };
-      checkTutorialStatus();
-      return () => {};
-    }, [])
-  );
-
-  // ✅ Function to mark tutorial as complete
-  const handleTutorialComplete = async () => {
-    try {
-      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
-      setShowTutorial(false);
-    } catch (e) {
-      console.error("Failed to save onboarding status", e);
-    }
-  };
-
+  // Single abort controller ref
+  const abortControllerRef = useRef(null);
+  const progressIntervalRef = useRef(null);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
-  if (sessionCacheId) {
+    if (categoryPrompt && !isNavigatingBackRef.current) {
+      console.log('🎯 Category prompt received:', categoryPrompt);
+      
+      // Use the category as a prompt
+      handleCategoryPrompt(categoryPrompt, categoryDetails);
+      
+      // Clear the params to prevent re-triggering
+      navigation.setParams({ 
+        categoryPrompt: undefined, 
+        categoryDetails: undefined 
+      });
+    }
+  }, [categoryPrompt, categoryDetails]);
+
+  // NEW FUNCTION: Handle category prompts
+  const handleCategoryPrompt = (prompt, details = '') => {
+    if (isNavigatingBackRef.current) {
+      console.log('🛡️ Blocking category prompt during back navigation');
+      return;
+    }
+    
+    Keyboard.dismiss();
+    
+    // Create a more detailed prompt if details are available
+    const fullPrompt = details ? `${prompt}: ${details}` : prompt;
+    
+    setAiResponse('');
+    setUserQuery(fullPrompt);
+    setMessage(fullPrompt);
+    setMode('typing');
+    
+    setTimeout(() => {
+      if (fullPrompt.trim() && !isNavigatingBackRef.current) {
+        const queryToSend = fullPrompt.trim();
+        setMessages(prev => {
+          const updated = [...prev, { type: 'user', text: queryToSend }];
+          saveChatHistory(sessionId, updated);
+          return updated;
+        });
+        setMessage('');
+        setThinking(true);
+        setMode('response');
+      }
+    }, 200);
+  };
+
+  const startProgress = (duration = 10000) => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    setProgress(0);
+    const startTime = Date.now();
+
+    progressIntervalRef.current = setInterval(() => {
+      if (!isMountedRef.current) return;
+      
+      const elapsed = Date.now() - startTime;
+      const percent = Math.min(100, (elapsed / duration) * 100);
+      setProgress(Math.floor(percent));
+
+      if (percent >= 100) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    }, 100);
+  };
+
+  const stopProgress = () => {
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    if (isMountedRef.current) {
+      setProgress(100);
+    }
+  };
+
+  const abortAllRequests = () => {
+    console.log('🛑 Aborting all pending requests...');
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    stopProgress();
+    if (isMountedRef.current) {
+      setThinking(false);
+    }
+  };
+
+  // Create styles dynamically
+  const styles = createStyles(colors);
+
+  const nextStep = () => {
+    if (tutorialStep < 5) {
+      setTutorialStep(tutorialStep + 1);
+    } else {
+      handleTutorialComplete();
+    }
+  };
+
+  // --- Tutorial Logic ---
+  useFocusEffect(
+    useCallback(() => {
+      const checkTutorialStatus = async () => {
+        try {
+          const hasCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
+          console.log("completed",hasCompleted)
+          if (hasCompleted != 'true') {
+            setShowTutorial(true);
+          }
+        } catch (e) {
+          console.error("Failed to load onboarding status", e);
+        }
+      };
+      checkTutorialStatus();
+      return () => {};
+    }, [])
+  );
+
+  const handleTutorialComplete = async () => {
+    try {
+      await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+      setShowTutorial(false);
+    } catch (e) {
+      console.error("Failed to save onboarding status", e);
+    }
+  };
+
+  // Component mount/unmount lifecycle
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      console.log('🔴 Component unmounting, cleaning up...');
+      isMountedRef.current = false;
+      abortAllRequests();
+    };
+  }, []);
+
+  // Cleanup on focus change
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🟢 Chat screen focused');
+      
+      return () => {
+        console.log('🔴 Chat screen unfocused');
+        abortAllRequests();
+      };
+    }, [])
+  );
+
+  // --- Chat History Logic ---
+  // Replace your current sessionCacheId effect with this:
+useEffect(() => {
+  if (sessionCacheId && sessionCacheId !== sessionId) {
+    console.log('🔄 Loading chat history from sessionCacheId:', sessionCacheId);
     loadChatHistory(sessionCacheId).then(history => {
-      setMessages(history);
-      setSessionId(sessionCacheId);
-      setMode(history.length ? 'response' : 'home');
+      if (isMountedRef.current && sessionCacheId === route.params?.sessionCacheId) {
+        setMessages(history);
+        setSessionId(sessionCacheId);
+        setMode(history.length ? 'response' : 'home');
+      }
     });
   }
-}, [sessionCacheId]);
+}, [sessionCacheId, sessionId]); // Add sessionId to dependencies
 
-
-  // Save messages for this session
-const saveChatHistory = async (sessionId, messages) => {
-  try {
-    await AsyncStorage.setItem(`chat_${sessionId}`, JSON.stringify(messages));
-  } catch (error) {
-    console.error('Error saving chat history:', error);
-  }
-};
-
-// Load messages for a session
-const loadChatHistory = async (sessionId) => {
-  try {
-    const stored = await AsyncStorage.getItem(`chat_${sessionId}`);
-    return stored ? JSON.parse(stored) : [];
-  } catch (error) {
-    console.error('Error loading chat history:', error);
-    return [];
-  }
-};
-
-// Load all chat sessions (for the Drawer)
-const getAllChatSessions = async () => {
-  try {
-    const keys = await AsyncStorage.getAllKeys();
-    const chatKeys = keys.filter(k => k.startsWith('chat_'));
-    const stores = await AsyncStorage.multiGet(chatKeys);
-    return stores.map(([key, value]) => ({
-      sessionId: key.replace('chat_', ''),
-      messages: JSON.parse(value),
-    }));
-  } catch (error) {
-    console.error('Error loading all sessions:', error);
-    return [];
-  }
-};
-
-
+  // --- API Request Logic ---
   const sendApiRequest = useCallback(async (queryToSend) => {
-  setThinking(true);
-  setProgress(0);
+    if (!isMountedRef.current) return;
+    
+    setThinking(true);
+    setProgress(0);
 
-  console.log(`Sending API Request with: Query='${queryToSend}' and Session_ID='${sessionId}'`);
-
-  try {
-    const response = await fetch(
-      'https://remostart-farmlingua-ai-conversational.hf.space/ask',
-      {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          query: queryToSend,
-          session_id: sessionId,
-        }),
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    // Abort any existing request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
 
-    const data = await response.json();
-    const aiText = data.answer || 'Sorry, I couldn\'t find an answer.';
-    console.log('API Response Data:', data);
-    setAiResponse(data.answer || 'Sorry, I couldn\'t find an answer.');
-    setMessages(prev => {
-  const updated = [...prev, { type: 'ai', text: aiText }];
-  saveChatHistory(sessionId, updated);
-  return updated;
-});
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
-  } catch (error) {
-    console.error('Error during API request:', error);
-    setAiResponse('Error: Could not connect to the AI service. Please try again.');
-    const errorText = 'Error: Could not connect to the AI service. Please try again.';
-    setMessages(prev => [...prev, { type: 'ai', text: errorText }]);
-  } finally {
-    setThinking(false);
-  }
-}, []);
-  // Focus the input when moving to 'typing' mode
+    console.log(`Sending API Request with: Query='${queryToSend}' and Session_ID='${sessionId}'`);
+
+    try {
+      const response = await fetch(
+        'https://remostart-farmlingua-ai-conversational.hf.space/ask',
+        {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            query: queryToSend,
+            session_id: sessionId,
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const aiText = data.answer || 'Sorry, I couldn\'t find an answer.';
+      
+      if (!isMountedRef.current) return;
+      
+      setAiResponse(aiText);
+      setMessages(prev => {
+        const updated = [...prev, { type: 'ai', text: aiText }];
+        saveChatHistory(sessionId, updated);
+        return updated;
+      });
+
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('🛑 API request aborted.');
+        return;
+      }
+
+      console.error('Error during API request:', error);
+      
+      if (!isMountedRef.current) return;
+      
+      const errorText = 'Error: Could not connect to the AI service. Please try again.';
+      setAiResponse(errorText);
+      setMessages(prev => {
+        const updated = [...prev, { type: 'ai', text: errorText }];
+        saveChatHistory(sessionId, updated);
+        return updated;
+      });
+    } finally {
+      if (isMountedRef.current) {
+        setThinking(false);
+      }
+      abortControllerRef.current = null;
+    }
+  }, [sessionId,isMountedRef]);
+
+  const sendTTS = useCallback(async (filePath, language) => {
+    if (!isMountedRef.current) return;
+    
+    // Abort any existing request before starting a new one
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
+    try {
+      console.log('📤 Sending file to TTS API:', filePath);
+      startProgress(8000);
+
+      const fileStat = await RNFS.stat(filePath);
+      const audioFile = {
+        uri: Platform.OS === 'android' ? `file://${fileStat.path}` : fileStat.path,
+        type: 'audio/wav',
+        name: 'speech.wav',
+      };
+
+      const response = await ApiService.speakAI(audioFile, language, controller.signal);
+      
+      if (!isMountedRef.current) return;
+      
+      stopProgress();
+      setThinking(false);
+
+      if (response?.audioUrl) {
+        setMessages(prev => {
+          const updated = [...prev, { type: 'ai', audio: response.audioUrl }];
+          saveChatHistory(sessionId, updated);
+          return updated;
+        });
+      }
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('🛑 TTS request aborted.');
+        return;
+      }
+
+      console.error('❌ TTS API failed:', error);
+      
+      if (!isMountedRef.current) return;
+      
+      stopProgress();
+      setThinking(false);
+      setMessages(prev => [
+        ...prev,
+        { type: 'ai', text: 'Error generating speech. Please try again.' },
+      ]);
+    } finally {
+      abortControllerRef.current = null;
+    }
+  }, [sessionId]);
+
+  // --- Effects ---
   useEffect(() => {
-
     if (mode === 'typing') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [mode]);
 
-  // Simulate AI response generation
 useEffect(() => {
-  let interval;
-  const lastUserMessage = messages.length > 0 && messages[messages.length - 1].type === 'user'
-        ? messages[messages.length - 1].text
-        : null;
+  // Don't process anything if we're in home mode or navigating back
+  if (mode === 'home' || isNavigatingBackRef.current) {
+    console.log('🛑 Blocking API effect in home mode or during back navigation');
+    return;
+  }
+  
+  const lastUserMessage =
+    messages.length > 0 && messages[messages.length - 1].type === 'user'
+      ? messages[messages.length - 1].text
+      : null;
 
-  if (thinking && lastUserMessage) {
-    setProgress(0);
-    const startTime = Date.now();
-    const maxDuration = 10000; // max wait time 8 seconds (adjust as needed)
+  if (thinking && lastUserMessage && isMountedRef.current) {
+    console.log('🚀 Starting API request for:', lastUserMessage);
+    startProgress(10000);
 
-    interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      // Calculate progress percent based on elapsed time capped to maxDuration
-      const percent = Math.min(100, (elapsed / maxDuration) * 100);
-      setProgress(Math.floor(percent));  
-    }, 100);
-
-    // Fire API request once at beginning of thinking
-    sendApiRequest(lastUserMessage).then(() => {
-      clearInterval(interval);
-      setProgress(100);
-      setThinking(false);
-      setMode('response');
-    }).catch(() => {
-      clearInterval(interval);
-      setProgress(100);
-      setThinking(false);
-      setAiResponse('Error: Could not connect to the AI service. Please try again.');
-      setMode('response');
-    });
-
-  } else {
-    // Clear interval anytime thinking ends
-    clearInterval(interval);
+    sendApiRequest(lastUserMessage)
+      .then(() => {
+        if (isMountedRef.current && mode !== 'home' && !isNavigatingBackRef.current) {
+          stopProgress();
+          setThinking(false);
+          setMode('response');
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current && mode !== 'home' && !isNavigatingBackRef.current) {
+          stopProgress();
+          setThinking(false);
+          setAiResponse('Error: Could not connect to the AI service.');
+          setMode('response');
+        }
+      });
   }
 
-  return () => clearInterval(interval);
-}, [thinking, userQuery, sendApiRequest]);
-
-
-
-  // Scroll to bottom when response is ready
+  return () => {
+    if (!isMountedRef.current) {
+      stopProgress();
+    }
+  };
+}, [thinking, messages, sendApiRequest, mode]);
   useEffect(() => {
     if (mode === 'response') {
       setTimeout(() => {
@@ -631,53 +402,91 @@ useEffect(() => {
     }
   }, [mode, aiResponse]);
 
+  // --- Handlers ---
   const handleLogout = async () => {
-    // Implement logout logic here
     console.log('Logging out...');
   };
 
   const handleInputFocus = () => {
-    // Only switch to typing if not already in response or typing mode
     if (mode !== 'response' && mode !== 'typing') {
-        setMode('typing');
+      setMode('typing');
     }
   };
 
   const handleQuickAction = (actionTitle) => { 
+  if (isNavigatingBackRef.current) {
+    console.log('🛡️ Blocking quick action during back navigation');
+    return;
+  }
+  
+  Keyboard.dismiss();
   setAiResponse(''); 
   setUserQuery(actionTitle);
   setMessage(actionTitle);
   setMode('typing');
   setTimeout(() => inputRef.current?.focus(), 100);
-  // Immediately send the message as if user pressed send
+  
   setTimeout(() => {
-    if (actionTitle.trim()) {
-      // setUserQuery(actionTitle.trim());
-      const queryToSend = actionTitle;
+    if (actionTitle.trim() && !isNavigatingBackRef.current) {
+      const queryToSend = actionTitle.trim();
       setMessages(prev => {
-  const updated = [...prev, { type: 'user', text: queryToSend }];
-  saveChatHistory(sessionId, updated);
-  return updated;
-});
-
+        const updated = [...prev, { type: 'user', text: queryToSend }];
+        saveChatHistory(sessionId, updated);
+        return updated;
+      });
       setMessage('');
       setThinking(true);
       setMode('response');
     }
   }, 200);
 };
-
-
+useEffect(() => {
+  console.log('🔍 Mode change debug:');
+  console.log('   - thinking:', thinking);
+  console.log('   - messages length:', messages.length);
+  console.log('   - isNavigatingBack:', isNavigatingBackRef.current);
+}, [mode, thinking, messages.length]);
+// Add this guard to prevent messages from triggering mode changes
+useEffect(() => {
+  if (isNavigatingBackRef.current) {
+    console.log('🛡️ Blocking mode change due to back navigation');
+    return;
+  }
+  
+  // If we have messages and we're not in response mode, check if we should switch
+  if (messages.length > 0 && mode !== 'response' && !thinking) {
+    console.log('📨 Messages detected, switching to response mode');
+    setMode('response');
+  }
+}, [messages, mode, thinking]);
+// Add this to debug storage operations
+useEffect(() => {
+  const debugStorage = async () => {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const chatKeys = keys.filter(key => key.startsWith('chat_history_'));
+      console.log('📦 Current chat history keys in storage:', chatKeys);
+      
+      for (const key of chatKeys) {
+        const value = await AsyncStorage.getItem(key);
+        console.log(`📦 ${key}:`, value ? JSON.parse(value).length + ' messages' : 'empty');
+      }
+    } catch (error) {
+      console.error('Storage debug failed:', error);
+    }
+  };
+  
+  debugStorage();
+}, [mode, messages.length]);
   const handleSend = () => {
     if (message.trim()) { 
-      // setUserQuery(message.trim());
-      const queryToSend = message;
+      Keyboard.dismiss();
+      const queryToSend = message.trim();
       setMessages(prev => {
-  const updated = [...prev, { type: 'user', text: queryToSend }];
-  saveChatHistory(sessionId, updated);
-  return updated;
-});
-
+        const updated = [...prev, { type: 'user', text: queryToSend }];
+        saveChatHistory(sessionId, updated);
+        return updated;
+      });
       setMessage(''); 
       setThinking(true); 
       setMode('response');  
@@ -685,456 +494,217 @@ useEffect(() => {
   };
 
   const handleBack = () => { 
-    if (mode === 'voice') {    
-      setIsListening(false);
-      setMode('home');
-      return;
-    }
-    if (mode === 'home') {
+  console.log(`🔙 handleBack called - current mode: ${mode}`);
+  
+  // Set a flag to prevent any state-triggered navigation
+  isNavigatingBackRef.current = true;
+  
+  Keyboard.dismiss();
+  abortAllRequests();
+  
+  if (mode === 'voice') {    
+    console.log('🎤 Switching from voice to home');
+    setIsListening(false);
+    setMode('home');
+    setTimeout(() => { isNavigatingBackRef.current = false; }, 100);
+    return;
+  }
+  
+  if (mode === 'home') {
+    console.log('🏠 Home mode - navigating back');
+    navigation.setParams({ sessionCacheId: undefined });
+    
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
       navigation.toggleDrawer();
     }
-    if (mode === 'response' || userQuery) {
-      setMode('home');
-      setMessages([]);
-      setUserQuery('');
-      setAiResponse('');
-      setThinking(false);
-      setProgress(0); 
-      setSessionId(generateSessionId()); 
-      
-    } else {
-      setMode('home');
-      
-    }
-    setMessage('');
-  };
+    isNavigatingBackRef.current = false;
+    return;
+  }
   
-  const renderHeader = () => (
-  <View style={styles.header}>
-    <Tooltip
-      isVisible={showTutorial && tutorialStep === 0}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Menu</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-            This is the menu. You can access settings and other features here.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={nextStep}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Next ({tutorialStep + 1}/6)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{paddingVertical: scaleHeight(5), }} onPress={handleTutorialComplete}>
-            <Text style={{ color: '#1870f2', fontWeight: 'bold',alignSelf:'center' }}>Skip {'>>'}</Text>
-          </TouchableOpacity>
-          </View>
-          
-        </View>
-      }
-      placement="bottom"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-      <TouchableOpacity style={styles.menuButton} onPress={handleBack} ref={menuRef}>
-        {mode === 'home' ? (
-          <Ionicons name='menu-sharp' size={scaleHeight(20)} color={colors.text} />
-        ) : (
-          <Ionicons name='arrow-back' size={scaleHeight(20)} color={colors.text} />
-        )}
-      </TouchableOpacity>
-    </Tooltip>
-
-    <Text style={[styles.headerTitle, { fontSize: scaleHeight(18) }]}>Farmlingua</Text>
-
-    <Tooltip
-      isVisible={showTutorial && tutorialStep === 1}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Profile</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-            This is your profile. Tap here to view or edit your personal information, check your activity, or log out from the app.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={nextStep}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Next ({tutorialStep + 1}/6)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{paddingVertical: scaleHeight(5), }} onPress={handleTutorialComplete}>
-            <Text style={{ color: '#1870f2', fontWeight: 'bold',alignSelf:'center' }}>Skip {'>>'}</Text>
-          </TouchableOpacity>
-          </View>
-          
-        </View>
-      }
-      placement="bottom"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-    <TouchableOpacity style={styles.profileButton} onPress={handleLogout} ref={profileRef}>
-      <View style={styles.profileImage}>
-        <Text style={styles.profileText}>U</Text>
-      </View>
-    </TouchableOpacity>
-    </Tooltip>
-  </View>
-);
-
-
-  const renderHomeContent = () => (
-    <ScrollView style={styles.scrollContentHome} contentContainerStyle={styles.scrollContentHomeContainer}>
-      <View style={styles.logoContainer}>
-        <Logo />
-      </View>
-      <View style={{ flexDirection: 'row', alignSelf: 'center', gap: spacing.md, marginTop: spacing.xl }}>
-        <Image source={require('../assets/images/wave.png')} style={{ width: scaleWidth(20), height: scaleWidth(20) }} /> 
-        <Text style={styles.voiceModeText}>Tap a mode to activate Voice</Text>
-      </View>
-{renderInputArea()}
-      <Tooltip
-      isVisible={showTutorial && tutorialStep === 5}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Search Quick Start</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-          This enables quick queries or task execution, from crop advice to weather insights, using natural language.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={handleTutorialComplete}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Got it</Text>
-          </TouchableOpacity>
-         
-          </View>
-          
-        </View>
-      }
-      placement="top"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-      <View ref={suggestionRef} style={[styles.quickActionsContainer, mode === 'home' ? { justifyContent: 'flex-start' } : { justifyContent: 'center' }]}>
-        {quickActions.map((action) => (
-          <TouchableOpacity
-            key={action.id}
-            style={styles.quickActionButton}
-            activeOpacity={0.8}
-            onPress={() => handleQuickAction(action.title)}
-          >
-            <Ionicons name={action.icon} size={scaleHeight(20)} color={colors.text} />
-            <Text style={styles.quickActionText}>{action.title}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      </Tooltip>
-    </ScrollView>
-  );
-const renderMessageBubble = (msg, index) => {
-    if (msg.type === 'user') {
-        return (
-            <View key={index} style={styles.userMessageContainer}>
-                <View>
-                    <Text style={styles.messageText}>{msg.text}</Text>
-                    {/* ... (User Action Bar logic can be reused here) ... */}
-                    <View style={{ marginRight: spacing.md, flexDirection: 'row', gap: spacing.md, alignSelf: 'flex-end', marginTop: spacing.sm }}>
-                        <TouchableOpacity><Ionicons name='copy-outline' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Ionicons name='share-outline' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Lucide name='thumbs-up' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                    </View>
-                </View>
-                <View style={styles.userAvatar}>
-                    <Text style={styles.userAvatarText}>U</Text>
-                </View>
-            </View>
-        );
-    } else if (msg.type === 'ai') {
-        return (
-            <View key={index} style={styles.aiMessageContainer}>
-                <View style={styles.aiAvatar}>
-                    <Lucide name="bot" size={scaleWidth(20)} color={colors.white} />
-                </View>
-                <View>
-                    <View style={styles.aiMessageBubble}>
-                        {/* <Text style={styles.aiMessageText}>{msg.text}</Text> */}
-                        <Markdown  markdownit={
-                MarkdownIt({typographer: true}).disable([ 'link', 'image' ])
-              } style={{
-    body: { color: colors.text, ...typography.body },
-    strong: { fontWeight: 'bold' },
-    list_item: { marginVertical: spacing.xs },
-  }}>{msg.text}</Markdown>
-                        {/* ... (Suggestions block can be included here if needed) ... */}
-                    </View>
-                    {/* ... (AI Action Bar logic can be reused here) ... */}
-                    <View style={styles.actionBar}>
-                        <TouchableOpacity><Lucide name='refresh-ccw' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Ionicons name='copy-outline' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Ionicons name='share-outline' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Lucide name='thumbs-up' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                        <TouchableOpacity><Lucide name='thumbs-down' size={scaleHeight(25)} color={colors.textLight} /></TouchableOpacity>
-                    </View>
-                </View>
-            </View>
-        );
+  console.log(`🔄 Resetting from ${mode} to home`);
+  
+  // CRITICAL: Clear the persisted chat history from storage
+  const clearPersistedHistory = async () => {
+    try {
+      await AsyncStorage.removeItem(`chat_history_${sessionId}`);
+      console.log('🗑️ Cleared persisted chat history for session:', sessionId);
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
     }
-    return null;
+  };
+  clearPersistedHistory();
+  
+  // Reset ALL chat state consistently
+  setMessages([]);
+  setUserQuery('');
+  setAiResponse('');
+  setThinking(false);
+  setProgress(0);
+  setMessage('');
+  
+  // Generate new session ID to prevent any cached data restoration
+  const newSessionId = generateSessionId();
+  setSessionId(newSessionId);
+  
+  setMode('home');
+  
+  // Clear navigation params
+  navigation.setParams({ sessionCacheId: undefined });
+  
+  // Reset the flag after state updates complete
+  setTimeout(() => { isNavigatingBackRef.current = false; }, 100);
 };
-  const renderChatHistory = () => (
-    <>
-     <ScrollView 
-        style={styles.chatContainer} 
-        contentContainerStyle={[styles.chatContent,{paddingBottom: bottomAreaHeight}]}
-        ref={scrollViewRef}
-    >
-      
-        {/* User Message */}
-        {messages.map(renderMessageBubble)}
+useEffect(() => {
+  if (isNavigatingBackRef.current && mode !== 'home') {
+    console.log('🛡️ Blocking mode change during back navigation');
+    setMode('home');
+  }
+}, [mode]);
+useEffect(() => {
+  console.log('📍 Navigation params changed:', route.params);
+  console.log('📍 Current sessionCacheId:', sessionCacheId);
+}, [route.params, sessionCacheId]);
 
-        {/* AI Response (Thinking or Complete) */}
-        {thinking && (
-                    <View style={styles.thinkingContainer}>
-                       <View style={{flexDirection: 'row',justifyContent:'space-between'}}>
-                        <Text style={styles.thinkingText}>Thinking</Text>
-                        <Text style={styles.thinkingText}>{progress}%</Text>
-                       </View>
-                        <View style={styles.progressBar}>
-                            <View style={[styles.progressFill, { width: `${progress}%` }]} />
-                        </View>
-                        
-                    </View>
-                )}
-            
-       
-      
-    </ScrollView>
-   
-       {renderInputArea()}
-   
-    
-    </>
-   
-  );
+// Also add this to track mode changes
+useEffect(() => {
+  console.log('🔄 Mode changed to:', mode);
+}, [mode]);
+  // REPLACE the useFocusEffect block at line 420 in ChatHomeSelectorScreen.js
 
-  const renderVoiceMode = () => (
-  <View style={styles.voiceModeContainer}>
-    {/* Fallback visual indicator */}
-    <RippleEffect isListening={isListening} />
-    
-    <Text style={styles.voiceText}>
-      {isListening ? 'Listening...' : 'Tap to start speaking'}
-    </Text>
-    
-    {isListening && (
-      <TouchableOpacity 
-        style={styles.stopListeningButton}
-        onPress={() => {
-          setIsListening(false);
-          setMode('home');  
-        }}
-      >
-        <Text style={styles.stopListeningText}>Stop Listening</Text>
-      </TouchableOpacity>
-    )}
-  </View>
+useFocusEffect(
+  useCallback(() => {
+    const onBackPress = () => {
+      console.log('📱 Hardware back button pressed');
+      if (mode !== 'home') {
+        handleBack();
+        return true; // Prevent default back behavior
+      }
+      return false; // Allow default back behavior in home mode
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => {
+      console.log('🧹 Cleaning up back handler');
+      subscription.remove();
+    };
+  }, [mode, handleBack]) // Include handleBack in dependencies
 );
 
-  const renderInputArea = () => {
-    // Render the simpler input for 'home' mode, and the chat-style input for 'typing'/'response' mode.
 
-    const isChatMode = mode === 'typing' || mode === 'response';
-    
-    return (
-      <Tooltip
-      isVisible={showTutorial && tutorialStep === 2}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Search Bar</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-          This central input field invites users to "Ask anything about farming...", serving as the main interaction area.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={nextStep}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Next ({tutorialStep + 1}/6)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{paddingVertical: scaleHeight(5), }} onPress={handleTutorialComplete}>
-            <Text style={{ color: '#1870f2', fontWeight: 'bold',alignSelf:'center' }}>Skip {'>>'}</Text>
-          </TouchableOpacity>
-          </View>
-          
-        </View>
-      }
-      placement="top"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-        <View onLayout={e => setBottomAreaHeight(e.nativeEvent.layout.height)} style={[styles.bottomContainer,{paddingBottom: isChatMode && Platform.OS === 'ios' ? spacing.lg : spacing.md,zIndex:10,position: isChatMode ? 'absolute' : 'relative',bottom: isChatMode && 0,alignSelf: isChatMode? 'center':'auto',paddingHorizontal: isChatMode&&scaleWidth(16)}]}>
-            <View style={styles.inputWrapper}>
-                <View style={[styles.inputContainer, isChatMode && styles.inputContainerChatMode]}>
-                                        
-                    <TextInput
-                        style={[styles.input, isChatMode && styles.inputChatMode]}
-                        placeholder="Ask anything about farming..."
-                        placeholderTextColor={colors.textLight}
-                        onFocus={() => setMode('typing')}
-                        ref={inputRef}
-                        value={message}
-                        onChangeText={setMessage}
-                        multiline={isChatMode}  
-                        minHeight={isChatMode ? scaleHeight(40) : undefined}
-                        
-                    />
-                   
-                    <View style={{ flexDirection: 'row', justifyContent:'space-between' }}>
-                       
-                            <Tooltip
-      isVisible={showTutorial && tutorialStep === 3}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Attachment(s)</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-          This icon allows users to attach images, soil reports, or documents for the AI to analyze; enabling visual or data-based responses.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={nextStep}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Next ({tutorialStep + 1}/6)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{paddingVertical: scaleHeight(5), }} onPress={handleTutorialComplete}>
-            <Text style={{ color: '#1870f2', fontWeight: 'bold',alignSelf:'center' }}>Skip {'>>'}</Text>
-          </TouchableOpacity>
-          </View>
-          
-        </View>
-      }
-      placement="top"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-                            <TouchableOpacity style={styles.attachButton} activeOpacity={0.8} ref={attachRef}>
-                                <Ionicons name='attach' size={scaleHeight(25)} color={colors.text} />
-                            </TouchableOpacity>
-                             
-                      </Tooltip>
-                        
-                        
-                        
-                        <View style={{flexDirection:'row'}}>
-                          <Tooltip
-      isVisible={showTutorial && tutorialStep === 4}
-      content={
-        <View>
-           <View style={{flexDirection:'row', justifyContent:'space-between', alignItems:'center'}}>
-           <Text style={{ color: 'white', fontSize: scaleHeight(16),fontWeight:'bold', marginBottom: scaleHeight(8) }}>Record Mode</Text>
-           <Ionicons name='close' size={scaleHeight(20)} color='white' onPress={handleTutorialComplete} />
-           </View>
-          <Text style={{ color: 'white', fontSize: 14, marginBottom: 8 }}>
-          The microphone icon activates voice input, allowing users to speak their queries hands-free. Ideal for farmers on the field, it converts speech into text and provides quick, conversational answers.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: scaleWidth(20),  }}>
-            <TouchableOpacity style={{paddingHorizontal: scaleWidth(15), paddingVertical: scaleHeight(5),borderRadius:scaleHeight(5),backgroundColor:'#1975ff'}} onPress={nextStep}>
-            <Text style={{ color: 'white', fontWeight: 'bold' }}>Next ({tutorialStep + 1}/6)</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={{paddingVertical: scaleHeight(5), }} onPress={handleTutorialComplete}>
-            <Text style={{ color: '#1870f2', fontWeight: 'bold',alignSelf:'center' }}>Skip {'>>'}</Text>
-          </TouchableOpacity>
-          </View>
-          
-        </View>
-      }
-      placement="top"
-      contentStyle={{backgroundColor:'#141c24', padding:scaleHeight(15), borderRadius:scaleHeight(10)}}
-      tooltipStyle={{width:scaleWidth(250)}}
-      arrowSize={{ width: scaleWidth(12), height: scaleHeight(8) }}
-      backgroundColor='transparent'
-      showChildInTooltip={false}
-      useInteractionManager
-    >
-                          <TouchableOpacity
-                            style={styles.micButton}
-                            activeOpacity={0.8}
-                            onPress={() => {
-                                setMode('voice');
-                                setIsListening(true);  
-                            }}  
-                        >
-                            <Ionicons name='mic-outline' size={scaleHeight(25)} color={colors.text} />
-                        </TouchableOpacity>
-                        </Tooltip>
-                        {isChatMode && (
-                            <TouchableOpacity
-                                style={[styles.sendButton, message.trim() && !thinking && styles.sendButtonActive]}
-                                activeOpacity={0.8}
-                                disabled={!message.trim() || thinking}
-                                onPress={handleSend}
-                            >
-                                <Ionicons name='arrow-up' size={scaleHeight(25)} color={'white'} />
-                            </TouchableOpacity>
-                        ) }
-                          </View>                
-                        
-                    </View>
-                </View>
-
-                {isChatMode && (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        style={[styles.shortcutsContainer,{marginTop:isChatMode && scaleHeight(20),marginBottom:isChatMode && scaleHeight(20)}]}
-                        contentContainerStyle={styles.shortcutsContent}
-                    >
-                        {quickActions.map((action, index) => (
-                            <TouchableOpacity
-                                key={index}
-                                style={styles.shortcutPill}
-                                activeOpacity={0.8}
-                                onPress={() => {
-                                    setMessage(action.title);
-                                    setTimeout(() => inputRef.current?.focus(), 100);
-                                }}
-                            >
-                                <Ionicons name={action.icon} size={scaleHeight(16)} color={colors.text} />
-                                <Text style={styles.shortcutText}>{action.title}</Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
-                )}
-            </View>
-        </View>
-        </Tooltip>
-    );
+  const handleSwitchToText = () => {
+    setIsListening(false);
+    setMode('typing');
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
+  const handleStopListening = () => {
+    setIsListening(false);
+    setMode('home');
+  };
 
+  const handleMicPress = () => {
+    Keyboard.dismiss();
+    setMode('voice');
+    setIsListening(true);
+  };
+
+  const handleSendAudio = (audioPath,language) => {
+    if (audioPath) {
+      const audioMessage = {
+        type: 'user',
+        text: '',
+        audio: audioPath,
+        timestamp: new Date().toISOString(),
+      };
+
+      setMessages(prev => {
+        const updated = [...prev, audioMessage];
+        saveChatHistory(sessionId, updated);
+        return updated;
+      });
+      setThinking(true);
+      setMode('response');
+
+      sendTTS(audioPath,language);
+    }
+  };
+
+  // --- Props for children ---
+  const headerProps = {
+    styles,
+    colors,
+    mode,
+    showTutorial,
+    tutorialStep,
+    menuRef,
+    profileRef,
+    onBackPress: handleBack,
+    onProfilePress: handleLogout,
+    onTutorialNext: nextStep,
+    onTutorialComplete: handleTutorialComplete,
+  };
+
+  const inputAreaProps = {
+    styles,
+    colors,
+    mode,
+    message,
+    thinking,
+    inputRef,
+    attachRef,
+    showTutorial,
+    tutorialStep,
+    onMessageChange: setMessage,
+    onInputFocus: handleInputFocus,
+    onSend: handleSend,
+    onMicPress: handleMicPress,
+    onLayout: e => setBottomAreaHeight(e.nativeEvent.layout.height),
+    onTutorialNext: nextStep,
+    onTutorialComplete: handleTutorialComplete,
+  };
+
+  const homeContentProps = {
+    ...inputAreaProps,
+    onQuickActionPress: handleQuickAction,
+    suggestionRef: suggestionRef,
+  };
+
+  const chatHistoryProps = {
+    ...inputAreaProps,
+    messages,
+    thinking,
+    progress,
+    bottomAreaHeight,
+    scrollViewRef,
+    markdownItInstance,
+    sessionId
+  };
+
+  const voiceModeProps = {
+    styles,
+    colors,
+    mode,
+    message,
+    thinking,
+    inputRef,
+    attachRef,
+    showTutorial,
+    tutorialStep,
+    isListening,
+    onMessageChange: setMessage,
+    onInputFocus: handleInputFocus,
+    onSend: handleSend,
+    onSwitchToText: handleSwitchToText,
+    onLayout: e => setBottomAreaHeight(e.nativeEvent.layout.height),
+    onTutorialNext: nextStep,
+    onTutorialComplete: handleTutorialComplete,
+    onQuickActionPress: handleQuickAction,
+    onSend: handleSendAudio,
+  };
+
+  // --- Render ---
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -1142,23 +712,554 @@ const renderMessageBubble = (msg, index) => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
       >
-        {renderHeader()}
+        <Header {...headerProps} />
         
-        {/* Main Content Area */}
         <View style={styles.mainContent}>
-            {mode === 'home' && renderHomeContent()}
-            {(mode === 'typing' || mode === 'response') && renderChatHistory()}
-            {mode === 'voice' && renderVoiceMode()}
+            {mode === 'home' && <ChatHomeContent {...homeContentProps} />}
+            {(mode === 'typing' || mode === 'response') && <ChatHistory {...chatHistoryProps} />}
+            {mode === 'voice' && <ChatVoiceMode {...voiceModeProps} />}
         </View>
-
        
       </KeyboardAvoidingView>
-   
-
     </SafeAreaView>
   );
 };
 
-
-
 export default ChatHomeSelectorScreen;
+
+
+// import {
+//   View,
+//   SafeAreaView,
+//   KeyboardAvoidingView,
+//   Platform,
+//   Keyboard,
+//   BackHandler,
+// } from 'react-native';
+// import { spacing, typography, borderRadius, shadows, scaleHeight, scaleWidth } from '../utils/theme';  
+// import { MarkdownIt } from 'react-native-markdown-display';
+// import { useFocusEffect } from '@react-navigation/native';
+// import AsyncStorage from '@react-native-async-storage/async-storage';
+// import { ThemeContext } from '../utils/ThemeContext';
+// // import OnboardingTutorial from './OnboardingTutorial'; // This seems unused, but keeping if needed
+// import RNFS from 'react-native-fs';
+// // Import new components
+// import Header from '../components/Header';
+// import ChatHomeContent from '../components/ChatHomeContent';
+// import ChatHistory from '../components/ChatHistory';
+// import ChatVoiceMode from '../components/ChatVoiceMode';
+
+// // Import new utils and styles
+// import { generateSessionId, saveChatHistory, loadChatHistory } from '../utils/chatUtils';
+// import { createStyles } from '../components/styles';
+// import ApiService from '../config/apiService';
+
+// // --- Main Component ---
+// const ChatHomeSelectorScreen = ({ navigation, route }) => {
+   
+//   // States to manage the chat flow
+//   const { sessionCacheId } = route.params || {};
+//   const [mode, setMode] = useState('home'); // 'home', 'typing', 'response', 'voice'
+//   const [message, setMessage] = useState('');
+//   const [userQuery, setUserQuery] = useState(''); // This seems unused, but keeping
+//   const [aiResponse, setAiResponse] = useState('');
+//   const [thinking, setThinking] = useState(false);
+//   const [progress, setProgress] = useState(0);
+//   const [bottomAreaHeight, setBottomAreaHeight] = useState(0);
+//   const [isListening, setIsListening] = useState(false);
+//   const [sessionId, setSessionId] = useState(generateSessionId()); 
+//   const inputRef = useRef(null);
+//   const scrollViewRef = useRef(null);
+//   const [messages, setMessages] = useState([]);
+//   const markdownItInstance = MarkdownIt({ typographer: true }).disable(['link', 'image']);
+//   const { colors } = useContext(ThemeContext);
+//   const [showTutorial, setShowTutorial] = useState(false);
+//   const [tutorialStep, setTutorialStep] = useState(0);
+//   const menuRef = useRef();
+//   const attachRef = useRef();
+//   const profileRef = useRef();
+//   const suggestionRef = useRef();
+//   const abortControllerRef = useRef(null);
+//   // const doneRef = useRef(); // This ref was declared but not used
+
+//   // Keep a single global ref for the interval
+// const progressIntervalRef = useRef(null);
+
+// const startProgress = (duration = 10000) => {
+//   if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+//   setProgress(0);
+//   const startTime = Date.now();
+
+//   progressIntervalRef.current = setInterval(() => {
+//     const elapsed = Date.now() - startTime;
+//     const percent = Math.min(100, (elapsed / duration) * 100);
+//     setProgress(Math.floor(percent));
+
+//     if (percent >= 100) {
+//       clearInterval(progressIntervalRef.current);
+//       progressIntervalRef.current = null;
+//     }
+//   }, 100);
+// };
+
+// const stopProgress = () => {
+//   if (progressIntervalRef.current) {
+//     clearInterval(progressIntervalRef.current);
+//     progressIntervalRef.current = null;
+//   }
+//   setProgress(100);
+// };
+
+
+//   // Create styles dynamically
+//   const styles = createStyles(colors);
+
+//   const nextStep = () => {
+//     if (tutorialStep < 5) {
+//       setTutorialStep(tutorialStep + 1);
+//     } else {
+//       handleTutorialComplete();
+//     }
+//   };
+
+//   // --- Tutorial Logic ---
+//   useFocusEffect(
+//     useCallback(() => {
+//       const checkTutorialStatus = async () => {
+//         try {
+//           const hasCompleted = await AsyncStorage.getItem('hasCompletedOnboarding');
+//           if (hasCompleted === 'false') { // Check for 'false' string
+//             setShowTutorial(true);
+//           }
+//         } catch (e) {
+//           console.error("Failed to load onboarding status", e);
+//         }
+//       };
+//       checkTutorialStatus();
+//       return () => {};
+//     }, [])
+//   );
+
+//   const handleTutorialComplete = async () => {
+//     try {
+//       await AsyncStorage.setItem('hasCompletedOnboarding', 'true');
+//       setShowTutorial(false);
+//     } catch (e) {
+//       console.error("Failed to save onboarding status", e);
+//     }
+//   };
+
+//   // --- Chat History Logic ---
+//   useEffect(() => {
+//     if (sessionCacheId) {
+//       loadChatHistory(sessionCacheId).then(history => {
+//         setMessages(history);
+//         setSessionId(sessionCacheId);
+//         setMode(history.length ? 'response' : 'home');
+//       });
+//     }
+//   }, [sessionCacheId]);
+//   useFocusEffect(
+//   useCallback(() => {
+//     // When ChatHomeSelectorScreen is focused
+//     console.log('🟢 Chat screen focused');
+
+//     return () => {
+//       // When navigating away
+//       console.log('🔴 Chat screen unfocused, aborting any pending requests...');
+//       if (abortControllerRef.current) {
+//         abortControllerRef.current.abort();
+//         abortControllerRef.current = null;
+//       }
+//       stopProgress(); // stop progress bar
+//       setThinking(false);
+//     };
+//   }, [])
+// );
+// useEffect(() => {
+//   return () => {
+//     if (abortControllerRef.current) {
+//       abortControllerRef.current.abort();
+//     }
+//   };
+// }, []);
+
+
+//   // --- API Request Logic ---
+//   const sendApiRequest = useCallback(async (queryToSend) => {
+//   setThinking(true);
+//   setProgress(0);
+
+//   // Abort any existing request before starting a new one
+//   if (abortControllerRef.current) {
+//     abortControllerRef.current.abort();
+//   }
+
+//   const controller = new AbortController();
+//   abortControllerRef.current = controller;
+
+//   console.log(`Sending API Request with: Query='${queryToSend}' and Session_ID='${sessionId}'`);
+
+//   try {
+//     const response = await fetch(
+//       'https://remostart-farmlingua-ai-conversational.hf.space/ask',
+//       {
+//         method: 'POST',
+//         headers: {
+//           Accept: 'application/json',
+//           'Content-Type': 'application/json',
+//         },
+//         body: JSON.stringify({
+//           query: queryToSend,
+//           session_id: sessionId,
+//         }),
+//         signal: controller.signal, // <-- This enables cancellation
+//       }
+//     );
+
+//     if (!response.ok) {
+//       throw new Error(`HTTP error! status: ${response.status}`);
+//     }
+
+//     const data = await response.json();
+//     const aiText = data.answer || 'Sorry, I couldn\'t find an answer.';
+//     setAiResponse(aiText);
+
+//     setMessages(prev => {
+//       const updated = [...prev, { type: 'ai', text: aiText }];
+//       saveChatHistory(sessionId, updated);
+//       return updated;
+//     });
+
+//   } catch (error) {
+//     if (error.name === 'AbortError') {
+//       console.log('🛑 API request aborted.');
+//       return; // exit quietly
+//     }
+
+//     console.error('Error during API request:', error);
+//     const errorText = 'Error: Could not connect to the AI service. Please try again.';
+//     setAiResponse(errorText);
+//     setMessages(prev => {
+//       const updated = [...prev, { type: 'ai', text: errorText }];
+//       saveChatHistory(sessionId, updated);
+//       return updated;
+//     });
+//   } finally {
+//     setThinking(false);
+//     abortControllerRef.current = null;
+//   }
+// }, [sessionId]);
+// const sendTTS = useCallback(async (filePath, language) => {
+//   // Abort any existing request before starting a new one
+//   if (abortControllerRef.current) {
+//     abortControllerRef.current.abort();
+//   }
+
+//   const controller = new AbortController();
+//   abortControllerRef.current = controller;
+//   try {
+//     console.log('📤 Sending file to TTS API:', filePath);
+//     startProgress(8000); // smooth progress for ~8s
+
+//     const fileStat = await RNFS.stat(filePath);
+//     const audioFile = {
+//       uri: Platform.OS === 'android' ? `file://${fileStat.path}` : fileStat.path,
+//       type: 'audio/wav',
+//       name: 'speech.wav',
+//     };
+
+//     const response = await ApiService.speakAI(audioFile, language,controller.signal);
+//     stopProgress();
+//     setThinking(false);
+
+//     if (response?.audioUrl) {
+//       setMessages(prev => {
+//         const updated = [...prev, { type: 'ai', audio: response.audioUrl }];
+//         saveChatHistory(sessionId, updated);
+//         return updated;
+//       });
+//     }
+//   } catch (error) {
+//     console.error('❌ TTS API failed:', error);
+//     stopProgress();
+//     setThinking(false);
+//     setMessages(prev => [
+//       ...prev,
+//       { type: 'ai', text: 'Error generating speech. Please try again.' },
+//     ]);
+//   }finally{
+//     abortControllerRef.current = null;
+//   }
+// }, [sessionId]);
+
+//   // --- Effects ---
+//   useEffect(() => {
+//     if (mode === 'typing') {
+//       setTimeout(() => inputRef.current?.focus(), 100);
+//     }
+//   }, [mode]);
+
+//   useEffect(() => {
+//   const lastUserMessage =
+//     messages.length > 0 && messages[messages.length - 1].type === 'user'
+//       ? messages[messages.length - 1].text
+//       : null;
+
+//   if (thinking && lastUserMessage) {
+//     startProgress(10000); // e.g. 10s for API progress
+
+//     sendApiRequest(lastUserMessage)
+//       .then(() => {
+//         stopProgress();
+//         setThinking(false);
+//         setMode('response');
+//       })
+//       .catch(() => {
+//         stopProgress();
+//         setThinking(false);
+//         setAiResponse('Error: Could not connect to the AI service.');
+//         setMode('response');
+//       });
+//   }
+
+//   return () => stopProgress();
+// }, [thinking, messages, sendApiRequest]);
+
+//   useEffect(() => {
+//     if (mode === 'response') {
+//       setTimeout(() => {
+//         scrollViewRef.current?.scrollToEnd({ animated: true });
+//       }, 50);
+//     }
+//   }, [mode, aiResponse]); // aiResponse triggers this when content changes
+
+//   // --- Handlers ---
+//   const handleLogout = async () => {
+//     console.log('Logging out...');
+//   };
+
+//   const handleInputFocus = () => {
+//     if (mode !== 'response' && mode !== 'typing') {
+//       setMode('typing');
+//     }
+//   };
+
+//   const handleQuickAction = (actionTitle) => { 
+//     Keyboard.dismiss();
+//     setAiResponse(''); 
+//     setUserQuery(actionTitle);
+//     setMessage(actionTitle);
+//     setMode('typing');
+//     setTimeout(() => inputRef.current?.focus(), 100);
+    
+//     setTimeout(() => {
+//       if (actionTitle.trim()) {
+//         const queryToSend = actionTitle.trim();
+//         setMessages(prev => {
+//           const updated = [...prev, { type: 'user', text: queryToSend }];
+//           saveChatHistory(sessionId, updated);
+//           return updated;
+//         });
+//         setMessage('');
+//         setThinking(true);
+//         setMode('response');
+//       }
+//     }, 200);
+//   };
+
+//   const handleSend = () => {
+//     if (message.trim()) { 
+//       Keyboard.dismiss();
+//       const queryToSend = message.trim();
+//       setMessages(prev => {
+//         const updated = [...prev, { type: 'user', text: queryToSend }];
+//         saveChatHistory(sessionId, updated);
+//         return updated;
+//       });
+//       setMessage(''); 
+//       setThinking(true); 
+//       setMode('response');  
+//     }
+//   };
+
+//   const handleBack = () => { 
+//     Keyboard.dismiss();
+//     if (mode === 'voice') {    
+//       setIsListening(false);
+//       setMode('home');
+//       return;
+//     }
+//     if (mode === 'home') {
+//       navigation.toggleDrawer();
+//     }
+//     if (mode === 'response' || userQuery) {
+//       setMode('home');
+//       setMessages([]);
+//       setUserQuery('');
+//       setAiResponse('');
+//       setThinking(false);
+//       setProgress(0); 
+//       setSessionId(generateSessionId()); 
+//     } else {
+//       setMode('home');
+//     }
+//     setMessage('');
+//   };
+
+//   useFocusEffect(
+//   useCallback(() => {
+//     const onBackPress = () => {
+//       if (mode !== 'home') {
+//         // Go back to home mode instead of leaving the app
+//         handleBack();
+//         return true; // prevent app exit
+//       }
+
+//       // If already in home mode, allow default Android behavior (exit app)
+//       return false;
+//     };
+
+//     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+
+//     return () => subscription.remove();
+//   }, [mode, handleBack])
+// );
+
+
+// const handleSwitchToText = () => {
+//     setIsListening(false);
+//     setMode('typing'); // Switch to typing mode
+//     setTimeout(() => inputRef.current?.focus(), 100); // Focus the input
+//   };
+//   const handleStopListening = () => {
+//     setIsListening(false);
+//     setMode('home');
+//   };
+
+//   const handleMicPress = () => {
+//     Keyboard.dismiss();
+//     setMode('voice');
+//     setIsListening(true);
+//   };
+
+//   const handleSendAudio = (audioPath,language) => {
+    
+//   if (audioPath) {
+   
+//     const audioMessage = {
+//       type: 'user',
+//       text: '',
+//       audio: audioPath,
+//       timestamp: new Date().toISOString(),
+//     };
+
+//     setMessages(prev => {
+//       const updated = [...prev, audioMessage];
+//       saveChatHistory(sessionId, updated);
+//       return updated;
+//     });
+//     setThinking(true);
+//     setMode('response');
+
+//     sendTTS(audioPath,language);
+//   }
+// };
+
+
+
+
+//   // --- Props for children ---
+//   const headerProps = {
+//     styles,
+//     colors,
+//     mode,
+//     showTutorial,
+//     tutorialStep,
+//     menuRef,
+//     profileRef,
+//     onBackPress: handleBack,
+//     onProfilePress: handleLogout,
+//     onTutorialNext: nextStep,
+//     onTutorialComplete: handleTutorialComplete,
+//   };
+
+//   const inputAreaProps = {
+//     styles,
+//     colors,
+//     mode,
+//     message,
+//     thinking,
+//     inputRef,
+//     attachRef,
+//     showTutorial,
+//     tutorialStep,
+//     onMessageChange: setMessage,
+//     onInputFocus: handleInputFocus,
+//     onSend: handleSend,
+//     onMicPress: handleMicPress,
+//     onLayout: e => setBottomAreaHeight(e.nativeEvent.layout.height),
+//     onTutorialNext: nextStep,
+//     onTutorialComplete: handleTutorialComplete,
+//   };
+
+//   const homeContentProps = {
+//     ...inputAreaProps, // Includes all input props
+//     onQuickActionPress: handleQuickAction,
+//     suggestionRef: suggestionRef,
+//   };
+
+//   const chatHistoryProps = {
+//     ...inputAreaProps, // Includes all input props
+//     messages,
+//     thinking,
+//     progress,
+//     bottomAreaHeight,
+//     scrollViewRef,
+//     markdownItInstance,
+//   };
+
+//   const voiceModeProps = {
+//   styles,
+//   colors,
+//   mode,
+//   message,
+//   thinking,
+//   inputRef,
+//   attachRef,
+//   showTutorial,
+//   tutorialStep,
+//   isListening,
+//   onMessageChange: setMessage,
+//   onInputFocus: handleInputFocus,
+//   onSend: handleSend,
+//   onSwitchToText: handleSwitchToText, // This will navigate back to text mode
+//   onLayout: e => setBottomAreaHeight(e.nativeEvent.layout.height),
+//   onTutorialNext: nextStep,
+//   onTutorialComplete: handleTutorialComplete,
+//   onQuickActionPress: handleQuickAction,
+//   onSend: handleSendAudio,
+// };
+
+//   // --- Render ---
+//   return (
+//     <SafeAreaView style={styles.safeArea}>
+//       <KeyboardAvoidingView
+//         style={styles.container}
+//         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+//         keyboardVerticalOffset={0}
+//       >
+//         <Header {...headerProps} />
+        
+//         <View style={styles.mainContent}>
+//             {mode === 'home' && <ChatHomeContent {...homeContentProps} />}
+//             {(mode === 'typing' || mode === 'response') && <ChatHistory {...chatHistoryProps} />}
+//             {mode === 'voice' && <ChatVoiceMode {...voiceModeProps} />}
+//         </View>
+       
+//       </KeyboardAvoidingView>
+//     </SafeAreaView>
+//   );
+// };
+
+// export default ChatHomeSelectorScreen;

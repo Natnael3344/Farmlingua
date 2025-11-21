@@ -90,14 +90,16 @@ android {
         versionName "1.0"
         externalNativeBuild {
             cmake {
-                cppFlags "-std=c++20"
+                cppFlags "-std=c++20"  
                 }
         }
          ndk {
             abiFilters "arm64-v8a", "armeabi-v7a" // or "x86_64" depending on your target
         }
     }
+    
     packagingOptions {
+      
        pickFirst 'lib/x86/libc++_shared.so'
        pickFirst 'lib/x86_64/libjsc.so'
        pickFirst 'lib/arm64-v8a/libjsc.so'
@@ -130,6 +132,7 @@ android {
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
+    implementation project(':react-native-fs')
 
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-android")

@@ -23,6 +23,9 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { CommonActions } from '@react-navigation/native';
 import { navigationRef } from '../utils/navigationRef';
 import { resetToWelcome } from '../utils/RootNavigation';
+import axios from 'axios';
+import { launchImageLibrary } from 'react-native-image-picker';
+import { ProfileContext } from '../utils/ProfileContext';
 // --- Utility Components (Simplified Placeholders) ---
 
 // Placeholder for the profile image
@@ -36,7 +39,7 @@ const ProfileImage = ({ size, source }) => (
   }}>
     {/* Using a placeholder image source for demonstration */}
     <Image
-      source={{ uri: source || 'https://i.pravatar.cc/150?img=49' }} 
+      source={{ uri: source }} 
       style={{ width: '100%', height: '100%' }}
       resizeMode="cover"
     />
@@ -79,7 +82,53 @@ const settingsSections = [
 
 const SettingsScreen = ({ navigation,onClose,setSession  }) => {
   const { isDarkMode, colors } = useContext(ThemeContext);
-  
+  const [profilePic, setProfilePic] = useState(null);
+  const [userName, setUserName] = useState('Loading...');
+  const { profile, updateProfile, fetchProfile } = useContext(ProfileContext);
+  console.log("profile context",profile)
+  const handleProfilePictureUpload = async () => {
+  try {
+    const result = await launchImageLibrary({
+      mediaType: 'photo',
+      quality: 0.8,
+    });
+
+    if (result.didCancel) return;
+    const file = result.assets[0];
+
+    const token = await AsyncStorage.getItem('userToken');
+    if (!token) {
+      Alert.alert('Error', 'You must be logged in');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('profile_picture', {
+      uri: file.uri,
+      name: file.fileName || 'profile.jpg',
+      type: file.type || 'image/jpeg',
+    });
+
+    const response = await axios.post(
+      'https://farmlingua-backend.onrender.com/api/users/upload-profile-picture',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    Alert.alert('Success', 'Profile picture updated!');
+    console.log(response.data);
+    fetchProfile()
+  } catch (error) {
+    console.error('Upload failed:', error);
+    Alert.alert('Error', 'Failed to upload picture');
+  }
+};
+
   // State for toggles
   const [settingsState, setSettingsState] = useState({
     searchSuggestions: true, 
@@ -186,7 +235,7 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
         <Text style={[styles.headerTitle, { color: colors.text,marginLeft:scaleWidth(20) }]}>Settings</Text>
         
         {/* Close Icon */}
-        <TouchableOpacity style={{position:'absolute', right: 0}} onPress={() => onClose()}>
+        <TouchableOpacity style={{position:'absolute', right: scaleWidth(20)}} onPress={() => onClose()}>
           <Ionicons name="close" size={scaleHeight(24)} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -195,12 +244,15 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
         
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          <ProfileImage size={scaleHeight(80)} />
-          <Text style={[styles.profileName, { color: colors.text }]}>Jide Lawal</Text>
-          <TouchableOpacity style={styles.editIcon}>
-            <Ionicons name="pencil" size={scaleHeight(16)} color={'blue'} />
-          </TouchableOpacity>
-        </View>
+  <TouchableOpacity onPress={handleProfilePictureUpload}>
+    <ProfileImage size={scaleHeight(80)} source={profile?.profile_picture} />
+  </TouchableOpacity>
+  <Text style={[styles.profileName, { color: colors.text }]}>{profile?.name}</Text>
+  <TouchableOpacity style={styles.editIcon} onPress={handleProfilePictureUpload}>
+    <Ionicons name="pencil" size={scaleHeight(16)} color={'blue'} />
+  </TouchableOpacity>
+</View>
+
 
         {/* Settings Options */}
         {settingsSections.map((section, index) => (
@@ -231,7 +283,7 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.sm },
+  container: { flex: 1, paddingLeft:scaleWidth(50) },
   scrollView: { flex: 1 },
   scrollViewContent: { paddingBottom: spacing.lg * 2 },
   

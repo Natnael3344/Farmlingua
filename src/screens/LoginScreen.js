@@ -10,20 +10,35 @@ import {
   Alert,
   Image,
 } from 'react-native';
-import { colors, spacing, typography, borderRadius, shadows } from '../utils/theme';
+import { colors, spacing, typography, borderRadius, shadows, scaleHeight } from '../utils/theme';
 import { supabase } from '../config/supabase';
 import { styles } from './CreateAccountScreen';
 import Logo from '../components/Logo';
 import ApiService from '../config/apiService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
-
+import StatusModal from '../components/StatusModal'
 const LoginScreen = ({ navigation,setSession }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState('success');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
 
+  const showModal = (type, title, message) => {
+    setModalType(type);
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalVisible(true);
+  };
+  const handleLoginGuest = async () => {
+  const userToken= await AsyncStorage.setItem('userToken', 'Guest');
+  setSession(userToken)
+
+     }
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -41,10 +56,14 @@ const LoginScreen = ({ navigation,setSession }) => {
             const userToken= await AsyncStorage.setItem('userToken', response.data.token);
             if (response.error) throw response.error;
             setSession(userToken)
-      Alert.alert('Success', 'Logged in successfully!');
+      // Alert.alert('Success', 'Logged in successfully!');
     } catch (error) {
       console.log("Login error:", error);
-      Alert.alert('Error', error.message);
+      showModal(
+        'error',
+        'Login Failed',
+        error?.message || 'Something went wrong. Please try again.'
+      );
     } finally {
       setLoading(false);
     }
@@ -139,7 +158,15 @@ const LoginScreen = ({ navigation,setSession }) => {
                 {loading ? 'Signing in...' : 'Sign in'}
               </Text>
             </TouchableOpacity>
-
+            <TouchableOpacity
+              style={[styles.primaryButton,{marginTop:scaleHeight(20)}]}
+              onPress={handleLoginGuest}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryButtonText}>
+                {'Sign in as a Guest'}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity onPress={handleGoogleSignIn} style={[styles.socialButton,{marginTop:spacing.md}]} activeOpacity={0.8}>
               <Image
                 source={require('../assets/images/google.png')}
@@ -157,6 +184,13 @@ const LoginScreen = ({ navigation,setSession }) => {
           </View>
         </View>
       </ScrollView>
+      <StatusModal
+        visible={modalVisible}
+        type={modalType}
+        title={modalTitle}
+        message={modalMessage}
+        onClose={() => setModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };

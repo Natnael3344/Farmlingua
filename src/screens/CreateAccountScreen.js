@@ -210,7 +210,7 @@ export const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: spacing.sm,
     alignItems: 'center',
-    ...shadows.small,
+    // ...shadows.small,
   },
   primaryButtonText: {
     ...typography.button,
