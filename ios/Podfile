@@ -24,12 +24,27 @@ target 'Farmlingua' do
   )
 
   post_install do |installer|
-    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    # 1. Run the standard React Native post-install script
     react_native_post_install(
       installer,
       config[:reactNativePath],
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # 2. FIX: Relax compiler strictness for all Pods
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        # Fix "Non-modular include" error
+        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
+        
+        # Fix "Return type" and other strict errors
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+        
+        # (Optional) Ensure C++ standard compatibility if needed
+        # config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+      end
+    end
   end
 end
+
