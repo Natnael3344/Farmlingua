@@ -52,28 +52,28 @@ const settingsSections = [
   {
     title: 'General',
     options: [
-      { name: 'Appearance', route: 'AppearanceSettings', isNavigatable: true, hasChevron: true },
+      { name: 'Appearance', route: 'Appearance', isNavigatable: true, hasChevron: true },
     ],
   },
-  {
-    title: null, 
-    options: [
-      { name: 'Search Suggestions', isToggle: true, stateKey: 'searchSuggestions' },
-    ],
-  },
-  {
-    title: 'Voice & Speech',
-    options: [
-      { name: 'Language', route: 'LanguageSettings', isNavigatable: true, hasChevron: true },
-      { name: 'Accent', route: 'AccentSettings', isNavigatable: true, hasChevron: true },
-    ],
-  },
+  // {
+  //   title: null, 
+  //   options: [
+  //     { name: 'Search Suggestions', isToggle: true, stateKey: 'searchSuggestions' },
+  //   ],
+  // },
+  // {
+  //   title: 'Voice & Speech',
+  //   options: [
+  //     { name: 'Language', route: 'Language', isNavigatable: true, hasChevron: true },
+  //     { name: 'Accent', route: 'Accent', isNavigatable: true, hasChevron: true },
+  //   ],
+  // },
   {
     title: 'About',
     options: [
-      { name: 'Support', route: 'SupportScreen', isNavigatable: true },
-      { name: 'Terms & Conditions', route: 'TermsScreen', isNavigatable: true },
-      { name: 'Privacy Policy', route: 'PrivacyScreen', isNavigatable: true },
+      { name: 'Support', route: 'Support', isNavigatable: true },
+      { name: 'Terms & Conditions', route: 'Terms', isNavigatable: true },
+      { name: 'Privacy Policy', route: 'Privacy', isNavigatable: true },
     ],
   },
 ];
@@ -178,6 +178,7 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
   const handleNavigation = (route) => {
     if (route) {
       console.log(`Navigating to ${route}`);
+      navigation.navigate(route)
       // Future: navigation.navigate(route);
     }
   };

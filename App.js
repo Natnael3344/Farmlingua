@@ -22,6 +22,12 @@ import { ThemeProvider } from './src/utils/ThemeContext';
 import SettingsDrawerLayout from './src/utils/SettingsDrawer';
 import { navigationRef } from './src/utils/navigationRef';
 import {ProfileProvider} from './src/utils/ProfileContext'
+import AppearanceSettings from './src/settings/AppearanceSettings'
+import AccentSettings from './src/settings/AccentSettings'
+import LanguageSettings from './src/settings/LanguageSettings'
+import PrivacyPolicy from './src/settings/PrivacyPolicy'
+import SupportScreen from './src/settings/SupportScreen'
+import TermsConditions from './src/settings/TermsConditions'
 enableScreens();
 const Stack = createStackNavigator();
 const Drawer = createDrawerNavigator();  
@@ -37,6 +43,7 @@ const AuthStack = () => (
     <Stack.Screen name="ChatTyping" component={ChatTypingScreen} />
     <Stack.Screen name="VoiceChat" component={VoiceChatScreen} />
     <Stack.Screen name="ChatResponse" component={ChatResponseScreen} />
+    
   </Stack.Navigator>
 );
 
@@ -51,6 +58,12 @@ const DrawerApp = ({ setSession }) => (
   >
     <Drawer.Screen name="AppContent" component={AuthStack} />
     <Drawer.Screen name="ChatScreen" component={ChatHomeSelectorScreen} />
+    <Drawer.Screen name="Appearance" component={AppearanceSettings} />
+    <Drawer.Screen name="Accent" component={AccentSettings} />
+    <Drawer.Screen name="Language" component={LanguageSettings} />
+    <Drawer.Screen name="Privacy" component={PrivacyPolicy} />
+    <Drawer.Screen name="Support" component={SupportScreen} />
+    <Drawer.Screen name="Terms" component={TermsConditions} />
     {/* <Drawer.Screen
       name="SettingsDrawerLayout"
       component={SettingsDrawerLayout}
