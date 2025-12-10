@@ -62,7 +62,7 @@ const LoginScreen = ({ navigation,setSession }) => {
       showModal(
         'error',
         'Login Failed',
-        error?.message || 'Something went wrong. Please try again.'
+        error.response.data.error || 'Something went wrong. Please try again.'
       );
     } finally {
       setLoading(false);
@@ -75,9 +75,10 @@ const LoginScreen = ({ navigation,setSession }) => {
       console.log("User Info:", userInfo);
       const idToken = userInfo.data.idToken;
       const response = await ApiService.socialGoogleLogin({ idToken });
-      await AsyncStorage.setItem('userToken', response.data.token);
       if (response.status === 200) {
         const { token, userId } = response.data;
+        const userToken= await AsyncStorage.setItem('userToken', response.data.token);
+      setSession(userToken)
         // Save token securely (AsyncStorage/SecureStore)
         // Navigate to authenticated part of your app
         console.log('Logged in user with id:', userId);
@@ -131,7 +132,7 @@ const LoginScreen = ({ navigation,setSession }) => {
               secureTextEntry
             />
 
-            <View style={style.optionsRow}>
+            {/* <View style={style.optionsRow}>
               <TouchableOpacity
                 style={style.checkboxContainer}
                 onPress={() => setRememberMe(!rememberMe)}
@@ -146,7 +147,7 @@ const LoginScreen = ({ navigation,setSession }) => {
               <TouchableOpacity onPress={handleForgotPassword}>
                 <Text style={style.forgotPassword}>Forgot password</Text>
               </TouchableOpacity>
-            </View>
+            </View> */}
 
             <TouchableOpacity
               style={[styles.primaryButton, loading && style.buttonDisabled]}

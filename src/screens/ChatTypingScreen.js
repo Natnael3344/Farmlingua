@@ -100,7 +100,7 @@ const ChatTypingScreen = ({ navigation }) => {
 
             
           </View>
-
+          
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -118,7 +118,9 @@ const ChatTypingScreen = ({ navigation }) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+            
           </View>
+          
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -254,6 +256,7 @@ const styles = StyleSheet.create({
   },
   shortcutsContent: {
     paddingRight: spacing.md,
+    
   },
   shortcutPill: {
     flexDirection: 'row',

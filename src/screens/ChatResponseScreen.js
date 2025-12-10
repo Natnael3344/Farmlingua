@@ -158,7 +158,9 @@ const ChatResponseScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView
+            
+          </View>
+          <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               style={styles.shortcutsContainer}
@@ -174,7 +176,6 @@ const ChatResponseScreen = ({ route, navigation }) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -427,6 +428,7 @@ const styles = StyleSheet.create({
   },
   shortcutsContainer: {
     marginBottom: spacing.sm,
+    flexGrow:0
   },
   shortcutsContent: {
     paddingRight: spacing.md,

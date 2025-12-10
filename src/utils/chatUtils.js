@@ -6,12 +6,15 @@ export const generateSessionId = () => Math.random().toString(36).substring(2, 1
 
 // Save messages for this session
 export const saveChatHistory = async (sessionId, messages) => {
+  console.log("messages id",messages)
   try {
     if (messages && messages.length > 0) {
       await AsyncStorage.setItem(`chat_history_${sessionId}`, JSON.stringify(messages));
+      console.log("chat history saved")
     } else {
       // If messages are empty, remove the item entirely
       await AsyncStorage.removeItem(`chat_history_${sessionId}`);
+      console.log("chat history removed")
     }
   } catch (error) {
     console.error('Failed to save chat history:', error);

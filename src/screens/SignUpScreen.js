@@ -16,12 +16,25 @@ import { styles } from './CreateAccountScreen';
 import Logo from '../components/Logo';
 import ApiService from '../config/apiService'
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const SignUpScreen = ({ navigation }) => {
+import StatusModal from '../components/StatusModal';
+const SignUpScreen = ({ navigation,setSession,route }) => {
+  const {emails}=route.params || {}
+  console.log("emails",emails)
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(emails || '');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-
+  const [modalVisible, setModalVisible] = useState(false);
+    const [modalType, setModalType] = useState('success');
+    const [modalTitle, setModalTitle] = useState('');
+    const [modalMessage, setModalMessage] = useState('');
+  
+    const showModal = (type, title, message) => {
+      setModalType(type);
+      setModalTitle(title);
+      setModalMessage(message);
+      setModalVisible(true);
+    };
   const handleSignUp = async () => {
     if (!name || !email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -29,7 +42,11 @@ const SignUpScreen = ({ navigation }) => {
     }
 
     if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      showModal(
+        'error',
+        'Sign Up Failed',
+        'Password must be at least 8 characters.'
+      );
       return;
     }
 
@@ -42,11 +59,24 @@ const SignUpScreen = ({ navigation }) => {
       };
       const response = await ApiService.register(userData);
       await AsyncStorage.setItem('userToken', response.data.token);
+      
+      setSession(response.data.token);
+      
       if (response.error) throw response.error;
 
-      Alert.alert('Success', 'Account created successfully!');
+     
+      showModal(
+        'success',
+        'Success',
+        'Account created successfully!'
+      );
     } catch (error) {
-      Alert.alert('Error', error.message);
+      showModal(
+        'error',
+        'Sign Up Failed',
+        error.response.data.error || 'Something went wrong. Please try again.'
+      );
+      console.log("account error",error.response.data.error)
     } finally {
       setLoading(false);
     }
@@ -128,6 +158,13 @@ const SignUpScreen = ({ navigation }) => {
           </View>
         </View>
       </ScrollView>
+      <StatusModal
+              visible={modalVisible}
+              type={modalType}
+              title={modalTitle}
+              message={modalMessage}
+              onClose={() => setModalVisible(false)}
+            />
     </SafeAreaView>
   );
 };

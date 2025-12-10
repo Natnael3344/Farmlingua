@@ -8,6 +8,7 @@ import {
   ScrollView,
   SafeAreaView,
   Image,
+  Platform,
 } from 'react-native';
 import Logo from '../components/Logo'
 import { colors, spacing, typography, borderRadius, shadows, scaleWidth, scaleHeight } from '../utils/theme';
@@ -15,11 +16,11 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import ApiService from '../config/apiService';
 import { LoginManager, AccessToken } from 'react-native-fbsdk-next';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-const CreateAccountScreen = ({ navigation }) => {
+const CreateAccountScreen = ({ navigation,setSession }) => {
   const [email, setEmail] = useState('');
 
   const handleGetStarted = () => {
-    navigation.navigate('SignUp');
+    navigation.navigate('SignUp',{emails:email});
   };
 
   const handleGoogleSignIn = async () => {
@@ -29,19 +30,22 @@ const CreateAccountScreen = ({ navigation }) => {
     console.log("User Info:", userInfo);
     const idToken = userInfo.data.idToken;
     const response = await ApiService.socialGoogleLogin({ idToken });
-    await AsyncStorage.setItem('userToken', response.data.token);
+    console.log("response",response)
     if (response.status === 200) {
       const { token, userId } = response.data;
+      const userToken= await AsyncStorage.setItem('userToken', response.data.token);
+      setSession(userToken)
       // Save token securely (AsyncStorage/SecureStore)
       // Navigate to authenticated part of your app
       console.log('Logged in user with id:', userId);
+      
     } else {
       // Handle unexpected response
       console.error('Authentication failed:', response.data);
     }
     console.log(userInfo);
   } catch (error) {
-    console.error(error);
+    console.error(error.response);
   }
 };
 const handleFacebookSignIn = async () => {
@@ -124,21 +128,21 @@ const handleFacebookSignIn = async () => {
               <Text style={styles.socialButtonText}>Sign up with Google</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8} onPress={handleFacebookSignIn}>
+            {/* <TouchableOpacity style={styles.socialButton} activeOpacity={0.8} onPress={handleFacebookSignIn}>
               <Image
                 source={require('../assets/images/facebook.png')}
                 style={styles.socialButtonIcon}
               />
               <Text style={styles.socialButtonText}>Sign up with Facebook</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
-            <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
+            {Platform.OS=='ios' && <TouchableOpacity style={styles.socialButton} activeOpacity={0.8}>
               <Image
                 source={require('../assets/images/apple.png')}
                 style={styles.socialButtonIcon}
               />
               <Text style={styles.socialButtonText}>Sign up with Apple</Text>
-            </TouchableOpacity>
+            </TouchableOpacity>}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>

@@ -22,6 +22,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../utils/ThemeContext'; // ✅ use our custom ThemeContext
 import SettingsDrawer from '../utils/SettingsDrawer';
 import { ProfileContext } from '../utils/ProfileContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 const drawerOptions = [
   { name: 'Planting & Seasons', icon: 'sunny-outline', details: 'Best time to plant by region' },
@@ -48,11 +49,25 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
     const chatKeys = keys.filter((k) => k.startsWith('chat_'));
     const stores = await AsyncStorage.multiGet(chatKeys);
     console.log("cached store",stores)
-    const data = stores.map(([key, value]) => ({
-      sessionId: key.replace('chat_', ''),
-      messages: JSON.parse(value),
-      title:value.text || 'Audio message'
-    }));
+    const data = stores.map(([key, value]) => {
+        // 1. Parse the stored data
+        const parsedData = JSON.parse(value);
+
+        // 2. Safely get the text from the first message
+        // We use optional chaining (?.) to prevent crashes if the array is empty
+        const firstMessageText = parsedData?.[0]?.text;
+
+        // 3. Truncate if the text is too long (optional, keeps UI clean)
+        const displayTitle = firstMessageText 
+          ? (firstMessageText.length > 30 ? firstMessageText.substring(0, 30) + '...' : firstMessageText)
+          : 'Audio message';
+
+        return {
+          sessionId: key.replace('chat_', ''),
+          messages: parsedData,
+          title: displayTitle // ✅ Sets title to "Plan an Harvest" etc.
+        };
+      });
     console.log("data",data)
     setSessions(data.reverse());
   };
@@ -65,6 +80,8 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
     const unsubscribe = navigation.addListener('focus', loadSessions);
     return unsubscribe;
   }, [navigation]);
+  
+
 
   // 🔍 Filter results
   const filteredCategories = useMemo(() => {
@@ -161,7 +178,10 @@ const CustomDrawerContent = ({ navigation,setSession }) => {
             styles.tabButton,
             activeTab === 'History' && { borderBottomColor: colors.text },
           ]}
-          onPress={() => setActiveTab('History')}
+          onPress={() => {
+    setActiveTab('History');
+    loadSessions();   // <–– reload history every tap
+  }}
         >
           <Text style={[styles.tabText, { color: colors.text }]}>History</Text>
         </TouchableOpacity>

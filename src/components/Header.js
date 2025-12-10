@@ -1,7 +1,7 @@
 // components/ChatHeader.js
 
-import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
+import React, { useContext, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
 import Tooltip from 'react-native-walkthrough-tooltip';
 import { scaleHeight, scaleWidth } from '../utils/theme';
@@ -16,13 +16,20 @@ const ChatHeader = ({
   menuRef,
   profileRef,
   onBackPress,
-  onProfilePress,
   onTutorialNext,
   onTutorialComplete,
+  navigation,
+  
 }) => {
   const { profile, updateProfile, fetchProfile } = useContext(ProfileContext);
-
+  
   console.log("tutorial",showTutorial)
+ 
+  const onProfilePress =  () => {
+    navigation.navigate("ImageViewer", {
+     image: profile.profile_picture,
+   });
+  };
   return (
     <View style={styles.header}>
       <Tooltip
@@ -66,7 +73,7 @@ const ChatHeader = ({
         </TouchableOpacity>
       </Tooltip>
 
-      <Text style={[styles.headerTitle, { fontSize: scaleHeight(18) }]}>Farmlingua</Text>
+      <Text style={[styles.headerTitle, { fontSize: scaleHeight(18),position:'absolute',left:'45%' }]}>Farmlingua</Text>
 
       <Tooltip
         isVisible={showTutorial && tutorialStep === 1}
@@ -98,10 +105,12 @@ const ChatHeader = ({
         showChildInTooltip={false}
         useInteractionManager
       >
-      <TouchableOpacity style={styles.profileButton} onPress={onProfilePress} ref={profileRef}>
-        <Image source={{uri:profile?.profile_picture}} style={styles.profileImage}/>
-        
+        {profile?.profile_picture&&(
+      <TouchableOpacity style={styles.profileButton} onPress={onProfilePress}  ref={profileRef}>
+        <Image source={{uri:profile?.profile_picture}} style={styles.profileImage}/>        
       </TouchableOpacity>
+        )
+}
       </Tooltip>
     </View>
   );

@@ -8,6 +8,8 @@ import {
   Switch,
   Image,
   Alert,
+  PermissionsAndroid,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
@@ -26,6 +28,7 @@ import { resetToWelcome } from '../utils/RootNavigation';
 import axios from 'axios';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { ProfileContext } from '../utils/ProfileContext';
+import StatusModal from '../components/StatusModal';
 // --- Utility Components (Simplified Placeholders) ---
 
 // Placeholder for the profile image
@@ -84,10 +87,24 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
   const { isDarkMode, colors } = useContext(ThemeContext);
   const [profilePic, setProfilePic] = useState(null);
   const [userName, setUserName] = useState('Loading...');
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalType, setModalType] = useState('success');
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const showModal = (type, title, message) => {
+      setModalType(type);
+      setModalTitle(title);
+      setModalMessage(message);
+      setModalVisible(true);
+    };
   const { profile, updateProfile, fetchProfile } = useContext(ProfileContext);
   console.log("profile context",profile)
+  
   const handleProfilePictureUpload = async () => {
   try {
+ 
+
+
     const result = await launchImageLibrary({
       mediaType: 'photo',
       quality: 0.8,
@@ -110,7 +127,7 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
     });
 
     const response = await axios.post(
-      'https://farmlingua-backend.onrender.com/api/users/upload-profile-picture',
+      'https://farmlingua-backend-g220.onrender.com/api/users/upload-profile-picture',
       formData,
       {
         headers: {
@@ -120,12 +137,20 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
       }
     );
 
-    Alert.alert('Success', 'Profile picture updated!');
+    showModal(
+        'success',
+        'Success',
+        'Profile picture updated!'
+      );
     console.log(response.data);
     fetchProfile()
   } catch (error) {
     console.error('Upload failed:', error);
-    Alert.alert('Error', 'Failed to upload picture');
+     showModal(
+        'error',
+        'Upload failed',
+        'Failed to upload picture.'
+      );
   }
 };
 
@@ -134,40 +159,55 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
     searchSuggestions: true, 
   });
 
-  const handleLogOut = async () => {
-    Alert.alert(
-      "Log Out",
-      "Are you sure you want to log out?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Log Out",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              // 1️⃣ Remove user token from storage
-              await AsyncStorage.removeItem('userToken');
+  // const handleLogOut = async () => {
+    
+  //   Alert.alert(
+  //     "Log Out",
+  //     "Are you sure you want to log out?",
+  //     [
+  //       { text: "Cancel", style: "cancel" },
+  //       {
+  //         text: "Log Out",
+  //         style: "destructive",
+  //         onPress: async () => {
+  //           try {
+  //             // 1️⃣ Remove user token from storage
+  //             await AsyncStorage.removeItem('userToken');
 
-              // 2️⃣ Try Google sign out (in case user used Google login)
-              const isSignedIn = await GoogleSignin.getCurrentUser();
-              if (isSignedIn) {
-                await GoogleSignin.signOut();
-              }
+  //             // 2️⃣ Try Google sign out (in case user used Google login)
+  //             const isSignedIn = await GoogleSignin.getCurrentUser();
+  //             if (isSignedIn) {
+  //               await GoogleSignin.signOut();
+  //             }
 
-                // 3️⃣ Reset navigation to Welcome screen
-                setSession(null);
+  //               // 3️⃣ Reset navigation to Welcome screen
+  //               setSession(null);
 
-              console.log("User logged out successfully.");
-            } catch (error) {
-              console.error("Logout error:", error);
-              Alert.alert("Error", "Something went wrong while logging out.");
-            }
-          },
-        },
-      ]
-    );
-  };
+  //             console.log("User logged out successfully.");
+  //           } catch (error) {
+  //             console.error("Logout error:", error);
+  //             Alert.alert("Error", "Something went wrong while logging out.");
+  //           }
+  //         },
+  //       },
+  //     ]
+  //   );
+  // };
 
+const handleLogOut = async () => {
+ try {
+    await AsyncStorage.removeItem('userToken');
+
+    const isSignedIn = await GoogleSignin.getCurrentUser();
+    if (isSignedIn) await GoogleSignin.signOut();
+
+    setSession(null);
+
+    // showModal("success", "Logged Out", "You have been logged out.");
+  } catch (error) {
+    showModal("error", "Logout Failed", "Please try again.");
+  }
+};
 
   const handleToggle = (key) => {
     setSettingsState(prev => ({ ...prev, [key]: !prev[key] }));
@@ -244,22 +284,36 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         
         {/* Profile Section */}
-        <View style={styles.profileSection}>
-  <TouchableOpacity onPress={handleProfilePictureUpload}>
-    <ProfileImage size={scaleHeight(80)} source={profile?.profile_picture} />
-  </TouchableOpacity>
-  <Text style={[styles.profileName, { color: colors.text }]}>{profile?.name}</Text>
-  <TouchableOpacity style={styles.editIcon} onPress={handleProfilePictureUpload}>
-    <Ionicons name="pencil" size={scaleHeight(16)} color={'blue'} />
-  </TouchableOpacity>
-</View>
+        {profile && (
+    <View style={styles.profileSection}>
+        {/* Profile Image with Overlay Pencil */}
+        <TouchableOpacity 
+            onPress={handleProfilePictureUpload}
+            style={styles.profileImageContainer}  
+        >
+            <ProfileImage size={scaleHeight(80)} source={profile?.profile_picture} />
+            
+            {/* Pencil Overlay */}
+            <View style={[styles.editIconOverlay, { backgroundColor: colors.primary }]}>
+                <Ionicons 
+                    name="pencil-outline" 
+                    size={scaleHeight(14)} 
+                    color={colors.background}  
+                />
+            </View>
+        </TouchableOpacity>
+        
+        {/* User Name */}
+        <Text style={[styles.profileName, { color: colors.text }]}>{profile?.name}</Text>
+    </View>
+)}
 
 
         {/* Settings Options */}
         {settingsSections.map((section, index) => (
           <View key={index} style={styles.sectionContainer}>
             {section.title && (
-              <Text style={[styles.sectionTitle, { color: 'black' }]}>
+              <Text style={[styles.sectionTitle, { color: colors.text  }]}>
                 {section.title}
               </Text>
             )}
@@ -268,17 +322,24 @@ const SettingsScreen = ({ navigation,onClose,setSession  }) => {
         ))}
 
         {/* Log Out Button */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogOut}>
+        
+        
+      </ScrollView>
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogOut}>
           <Text style={[styles.logoutText, { color: colors.error || 'red' }]}>Log Out</Text>
           <Ionicons name="log-out-outline" size={scaleHeight(24)} color={colors.error || 'red'} />
         </TouchableOpacity>
-        
-      </ScrollView>
-
       {/* Footer Version */}
       <Text style={[styles.versionText, { color: colors.textLight }]}>
         FarmLingua v1.00000024
       </Text>
+      <StatusModal
+              visible={modalVisible}
+              type={modalType}
+              title={modalTitle}
+              message={modalMessage}
+              onClose={() => setModalVisible(false)}
+            />
     </SafeAreaView>
   );
 };
@@ -298,17 +359,39 @@ const styles = StyleSheet.create({
   headerTitle: { ...typography.title, fontWeight: 'bold', fontSize: scaleHeight(18) },
 
   // Profile Styles
+
   profileSection: {
-    flexDirection: 'row',
+    flexDirection: 'row', 
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     marginBottom: spacing.md,
-    marginLeft:spacing.lg
+    marginLeft: spacing.lg
   },
-  profileName: { 
-    ...typography.body, 
-    fontWeight: '600', 
-    marginLeft: spacing.md 
+  
+  profileImageContainer: {
+    width: scaleHeight(80),
+    height: scaleHeight(80),
+    borderRadius: scaleHeight(40),
+  },
+
+  editIconOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: scaleHeight(30), 
+    height: scaleHeight(30),
+    borderRadius: scaleHeight(15), 
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,  
+    borderColor: 'white',  
+    zIndex: 10,
+  },
+
+  profileName: {
+    ...typography.body,
+    fontWeight: '600',
+    marginLeft: spacing.md
   },
   editIcon: {
     marginLeft: spacing.sm,

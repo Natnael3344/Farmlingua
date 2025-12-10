@@ -231,22 +231,50 @@
 // export default React.memo(MessageBubble);
 
 
-import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Platform, PermissionsAndroid } from 'react-native';
+import React, { useRef, useState, useCallback, useEffect, useContext } from 'react';
+import { View, Text, TouchableOpacity, Platform, PermissionsAndroid, Image, Clipboard, Share } from 'react-native';
 import { Ionicons } from '@react-native-vector-icons/ionicons';
+import Toast from 'react-native-toast-message';
 import { Lucide } from '@react-native-vector-icons/lucide';
 import Markdown from 'react-native-markdown-display';
 import { scaleHeight, scaleWidth, spacing, typography } from '../utils/theme';
 import Sound from 'react-native-nitro-sound';
-
 import ApiService from '../config/apiService';
+import { ProfileContext } from '../utils/ProfileContext';
 
 const MessageBubble = ({ msg, index, styles, colors, markdownItInstance }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioAnswer, setAudioAnswer] = useState();
   const soundRef = useRef(null);
+  const { profile} = useContext(ProfileContext);
 
   console.log("message response", msg);
+
+  const handleCopy = useCallback(() => {
+  const textToCopy = msg?.text || '';
+
+  if (!textToCopy) return;
+
+  Clipboard.setString(textToCopy);
+  Toast.show({
+    type: 'success',
+    text1: 'Copied to clipboard',
+  });
+}, [msg]);
+
+const handleShare = useCallback(async () => {
+  try {
+    if (!msg?.text) return;
+
+    await Share.share({
+      message: msg.text,
+    });
+  } catch (error) {
+    console.log('Share error:', error);
+  }
+}, [msg]);
+
+
 
   // Cleanup sound on unmount
   useEffect(() => {
@@ -326,7 +354,7 @@ const MessageBubble = ({ msg, index, styles, colors, markdownItInstance }) => {
 
   // Audio Message Component - memoized
   const renderAudioMessage = useCallback(() => (
-    <View style={[styles.aiMessageBubble, { marginLeft: scaleWidth(35), alignItems: 'center', justifyContent: 'center' }]}>
+    <View style={[styles.aiMessageBubble, { marginLeft: scaleWidth(35),marginRight:scaleWidth(10), alignItems: 'center', justifyContent: 'center' }]}>
       <TouchableOpacity 
         style={styles.audioButton}
         onPress={handlePlayPause}
@@ -358,27 +386,27 @@ const MessageBubble = ({ msg, index, styles, colors, markdownItInstance }) => {
       alignSelf: isUser ? 'flex-end' : 'flex-start', 
       marginTop: spacing.sm 
     }}>
-      {!isUser && (
+      {/* {!isUser && (
         <TouchableOpacity>
           <Lucide name='refresh-ccw' size={scaleHeight(25)} color={colors.textLight} />
         </TouchableOpacity>
-      )}
+      )} */}
       <TouchableOpacity>
-        <Ionicons name='copy-outline' size={scaleHeight(25)} color={colors.textLight} />
+        <Ionicons name='copy-outline' size={scaleHeight(25)} color={colors.textLight} onPress={handleCopy}/>
       </TouchableOpacity>
       <TouchableOpacity>
-        <Ionicons name='share-outline' size={scaleHeight(25)} color={colors.textLight} />
+        <Ionicons name='share-outline' size={scaleHeight(25)} color={colors.textLight} onPress={handleShare}/>
       </TouchableOpacity>
-      <TouchableOpacity>
+      {/* <TouchableOpacity>
         <Lucide name='thumbs-up' size={scaleHeight(25)} color={colors.textLight} />
-      </TouchableOpacity>
-      {!isUser && (
+      </TouchableOpacity> */}
+      {/* {!isUser && (
         <TouchableOpacity>
           <Lucide name='thumbs-down' size={scaleHeight(25)} color={colors.textLight} />
         </TouchableOpacity>
-      )}
+      )} */}
     </View>
-  ), [colors.textLight, spacing]);
+  ), [colors.textLight, spacing, handleCopy, handleShare]);
 
   // User message component
   const renderUserMessage = useCallback(() => (
@@ -393,9 +421,11 @@ const MessageBubble = ({ msg, index, styles, colors, markdownItInstance }) => {
         
         {renderActionButtons(true)}
       </View>
-      <View style={styles.userAvatar}>
+      {!profile?.profile_picture? (<View style={styles.userAvatar}>
         <Text style={styles.userAvatarText}>U</Text>
-      </View>
+      </View>):(
+        <Image style={styles.userAvatar} source={{uri:profile?.profile_picture}}/>
+      )}
     </View>
   ), [msg, styles, renderAudioMessage, renderActionButtons]);
 

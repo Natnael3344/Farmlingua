@@ -334,7 +334,6 @@ export const createStyles = (colors) => StyleSheet.create({
     borderColor: colors.black,
   },
   shortcutsContainer: {
-    marginBottom: spacing.sm,
   },
   shortcutsContent: {
     paddingRight: spacing.md,
@@ -349,6 +348,7 @@ export const createStyles = (colors) => StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginRight: spacing.sm,
+    height: scaleHeight(40),
   },
   shortcutText: {
     ...typography.bodySmall,

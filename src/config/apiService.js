@@ -1,7 +1,7 @@
 import axios from "axios";
 import RNFS from 'react-native-fs';
 import { encode } from 'base64-arraybuffer';
-const API_BASE_URL = 'https://farmlingua-backend.onrender.com';
+const API_BASE_URL = 'https://farmlingua-backend-g220.onrender.com';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

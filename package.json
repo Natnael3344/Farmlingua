@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.2.0",
+    "@react-native-clipboard/clipboard": "^1.16.3",
     "@react-native-google-signin/google-signin": "^15.0.0",
     "@react-native-vector-icons/common": "^12.3.0",
     "@react-native-vector-icons/evil-icons": "^12.3.0",
@@ -36,6 +37,7 @@
     "react-native-reanimated": "^3.19.1",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.15.2",
+    "react-native-toast-message": "^2.3.3",
     "react-native-walkthrough-tooltip": "^1.6.0"
   },
   "devDependencies": {
