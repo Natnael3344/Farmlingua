@@ -51,6 +51,10 @@ const ApiService = {
   socialGoogleLogin: (tokenData) =>
     api.post('/api/auth/social/google', { idToken: tokenData.idToken }),
 
+  socialAppleLogin: (tokenData) =>
+  api.post('/api/auth/social/apple', { idToken: tokenData.idToken }),
+
+
   socialFacebookLogin: (tokenData) =>
     api.post('/api/auth/social/facebook', tokenData),
 
